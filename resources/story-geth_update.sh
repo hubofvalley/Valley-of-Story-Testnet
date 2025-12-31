@@ -18,7 +18,6 @@ update_version() {
     source /etc/os-release
     if [ "$VERSION_ID" = "22.04" ]; then
         echo "Building from source for Ubuntu 22.04"
-        sudo systemctl stop story story-geth
         mkdir -p $HOME/story-geth
         cd $HOME/story-geth || { echo "Failed to enter $HOME/story-geth"; exit 1; }
         if ! wget -O "${version}.tar.gz" "https://github.com/piplabs/story-geth/archive/refs/tags/${version}.tar.gz"; then
@@ -34,6 +33,7 @@ update_version() {
             echo "Build failed. Exiting."
             exit 1
         fi
+        sudo systemctl stop story story-geth
         if ! cp build/bin/geth "$HOME/go/bin/"; then
             echo "Failed to copy binary. Exiting."
             exit 1
@@ -42,12 +42,12 @@ update_version() {
         sudo chmod +x "$HOME/go/bin/geth"
     elif dpkg --compare-versions "$VERSION_ID" "gt" "22.04"; then
         echo "Using pre-built binary for Ubuntu $VERSION_ID"
-        sudo systemctl stop story story-geth
         mkdir -p "$HOME/story-geth-$version"
         if ! wget -P "$HOME/story-geth-$version" "$download_url/$geth_file_name" -O "$HOME/story-geth-$version/geth"; then
             echo "Failed to download the binary. Exiting."
             exit 1
         fi
+        sudo systemctl stop story story-geth
         sudo mv "$HOME/story-geth-$version/geth" "$HOME/go/bin/geth"
         sudo chown -R "$USER:$USER" "$HOME/go/bin/geth"
         sudo chmod +x "$HOME/go/bin/geth"
