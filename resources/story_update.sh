@@ -22,14 +22,14 @@ init_cosmovisor() {
     echo "Initializing cosmovisor..."
 
     # Download genesis story version
-    mkdir -p story-v1.1.1
-    if ! wget -p $HOME/story-v1.1.1 https://github.com/piplabs/story/releases/download/v1.1.1/story-linux-amd64 -O $HOME/story-v1.1.1/story; then
+    mkdir -p story-v1.4.2
+    if ! wget -p $HOME/story-v1.4.2 https://github.com/piplabs/story/releases/download/v1.4.2/story-linux-amd64 -O $HOME/story-v1.4.2/story; then
         echo "Failed to download the genesis binary. Exiting."
         exit 1
     fi
 
     # Initialize cosmovisor
-    if ! cosmovisor init $HOME/story-v1.1.1/story; then
+    if ! cosmovisor init $HOME/story-v1.4.2/story; then
         echo "Failed to initialize cosmovisor. Exiting."
         exit 1
     fi
@@ -49,12 +49,12 @@ init_cosmovisor110() {
     sudo systemctl stop story story-geth
 
     # Download genesis story version
-    mkdir -p story-v1.2.0
-    wget -p $HOME/story-v1.2.0 https://github.com/piplabs/story/releases/download/v1.2.0/story-linux-amd64 -O $HOME/story-v1.2.0/story
+    mkdir -p story-v1.4.2
+    wget -p $HOME/story-v1.4.2 https://github.com/piplabs/story/releases/download/v1.4.2/story-linux-amd64 -O $HOME/story-v1.4.2/story
 
     # Initialize cosmovisor
     sudo rm -r $HOME/.story/story/cosmovisor
-    cosmovisor init $HOME/story-v1.2.0/story
+    cosmovisor init $HOME/story-v1.4.2/story
     cd $HOME/go/bin/
     sudo rm -r story
     ln -s $HOME/.story/story/cosmovisor/current/bin/story story
@@ -156,7 +156,8 @@ update_version() {
     sudo chown -R $USER:$USER $HOME/go/bin/story && \
     sudo chmod +x $HOME/story-$version/story && \
     sudo chmod +x $HOME/go/bin/story && \
-    sudo rm -f $HOME/.story/story/data/upgrade-info.json
+    sudo rm -f $HOME/.story/story/data/upgrade-info.json && \
+    sudo rm -r $HOME/.story/story/cosmovisor/upgrades/$version
 
     # Copy the updated binary to the cosmovisor genesis directory
     GENESIS_DIR="$HOME/.story/story/cosmovisor/genesis/bin"
@@ -174,10 +175,10 @@ update_version() {
 # Function to perform batch update
 batch_update_version() {
     local version1="v1.1.0"
-    local version2="v1.2.0"
+    local version2="v1.4.2"
     local version3="v1.3.0"
     local download_url1="https://github.com/piplabs/story/releases/download/v1.1.0"
-    local download_url2="https://github.com/piplabs/story/releases/download/v1.2.0"
+    local download_url2="https://github.com/piplabs/story/releases/download/v1.4.2"
     local download_url3="https://github.com/piplabs/story/releases/download/v1.3.0"
     local upgrade_height1=640000
     local upgrade_height2=3861111
@@ -224,12 +225,13 @@ realtime_block_height=$(echo "$rpc_response" | jq -r '.result' | xargs printf "%
 echo "Choose the version to update to:"
 #read -p "There are currently no new versions available."
 echo -e "a. ${YELLOW}v1.1.0${RESET} (${GREEN}Virgil${RESET} Upgrade height: 640,000)"
-echo -e "b. ${YELLOW}v1.1.1${RESET} (${GREEN}Additional update for validator CLI interaction${RESET} Upgrade height: 1,398,904)"
-echo -e "c. ${YELLOW}v1.2.0${RESET} (${GREEN}Ovid${RESET} Upgrade height: 3,861,111)"
+echo -e "b. ${YELLOW}v1.4.2${RESET} (${GREEN}Additional update for validator CLI interaction${RESET} Upgrade height: 1,398,904)"
+echo -e "c. ${YELLOW}v1.4.2${RESET} (${GREEN}Ovid${RESET} Upgrade height: 3,861,111)"
 echo -e "d. ${YELLOW}v1.3.0${RESET} (${GREEN}Polybius${RESET} Upgrade height: 5,707,000)"
 echo -e "e. ${YELLOW}v1.3.3${RESET} (${RESET}Upgrade height: 10,032,301)"
 echo -e "f. ${YELLOW}v1.4.0${RESET} (${GREEN}Terence${RESET} Upgrade height: 10,886,680)"
-#echo "f. Batch update: Upgrade to v1.1.0 at height 640,000, v1.1.1 at height 858,000, v1.2.0 at height 3,861,111 and v1.3.0 at height 5,707,000 (RECOMMENDED FOR THOSE AIMING TO ACHIEVE ARCHIVE NODE STATUS)."
+echo -e "g. ${YELLOW}v1.4.2${RESET} (${GREEN}v1.4 critical security issue fix${RESET} Upgrade height: $(LC_NUMERIC='en_US.UTF-8' printf "%'d" $((realtime_block_height + 100))))"
+#echo "f. Batch update: Upgrade to v1.1.0 at height 640,000, v1.4.2 at height 858,000, v1.4.2 at height 3,861,111 and v1.3.0 at height 5,707,000 (RECOMMENDED FOR THOSE AIMING TO ACHIEVE ARCHIVE NODE STATUS)."
 read -p "Enter the letter corresponding to the version: " choice
 
 case $choice in
@@ -237,10 +239,10 @@ case $choice in
         update_version "v1.1.0" "https://github.com/piplabs/story/releases/download/v1.1.0" 640000
         ;;
     b)
-        update_version "v1.1.1" "https://github.com/piplabs/story/releases/download/v1.1.1" 1398904
+        update_version "v1.4.2" "https://github.com/piplabs/story/releases/download/v1.4.2" 1398904
         ;;
     c)
-        update_version "v1.2.0" "https://github.com/piplabs/story/releases/download/v1.2.0" 3861111
+        update_version "v1.4.2" "https://github.com/piplabs/story/releases/download/v1.4.2" 3861111
         ;;
     d)
         update_version "v1.3.0" "https://github.com/piplabs/story/releases/download/v1.3.0" 5707000
@@ -250,6 +252,9 @@ case $choice in
         ;;
     f)  
         update_version "v1.4.0" "https://github.com/piplabs/story/releases/download/v1.4.0" 10886680
+        ;;
+    g)
+        update_version "v1.4.2" "https://github.com/piplabs/story/releases/download/v1.4.2" $((realtime_block_height + 100))
         ;;
     #f)
         #batch_update_version
