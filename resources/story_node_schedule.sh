@@ -12,9 +12,11 @@ RESET=$'\033[0m'
 LOG_DIR="$HOME/.story"
 LOG_FILE="$LOG_DIR/story_schedule_jobs.log"
 
-sudo apt-get update
-sudo apt-get install -y at
-sudo systemctl enable --now atd
+if ! command -v at >/dev/null 2>&1; then
+    sudo apt-get update
+    sudo apt-get install -y at
+    sudo systemctl enable --now atd
+fi
 
 echo -e "${CYAN}Current server time (UTC):${RESET}"
 echo -e "${GREEN}$(date -u)${RESET}"
