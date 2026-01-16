@@ -481,10 +481,15 @@ function restart_validator_node() {
 function show_node_status() {
     port=$(grep -oP 'laddr = "tcp://(0.0.0.0|127.0.0.1):\K[0-9]+57' "$HOME/.story/story/config/config.toml") && curl "http://127.0.0.1:$port/status" | jq
     geth_block_height=$(geth --exec "eth.blockNumber" attach $HOME/.story/geth/aeneid/geth.ipc)
+    consensus_peers=$(curl -s "http://127.0.0.1:$port/net_info" | jq -r '.result.n_peers // "0"')
+    execution_peers_raw=$(geth --exec "net.peerCount" attach $HOME/.story/geth/aeneid/geth.ipc)
+    execution_peers=$(printf "%d" "$execution_peers_raw" 2>/dev/null || echo "$execution_peers_raw")
     realtime_block_height=$(curl -s -X POST "https://aeneid.storyrpc.io" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' | jq -r '.result' | xargs printf "%d\n")
     node_height=$(story status | jq -r '.sync_info.latest_block_height')
     echo "Consensus client block height: $node_height"
     echo "Execution client (story-geth) block height: $geth_block_height"
+    echo "Consensus client peers connected: $consensus_peers"
+    echo "Execution client peers connected: $execution_peers"
     block_difference=$(( realtime_block_height - node_height ))
     echo "Real-time Block Height: $realtime_block_height"
     echo -e "${YELLOW}Block Difference:${NC} $block_difference"
