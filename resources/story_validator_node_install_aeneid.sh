@@ -23,13 +23,26 @@ fi
 read -p "Do you want to enable the indexer? (yes/no): " ENABLE_INDEXER
 read -p "Configure UFW firewall rules for Story? (y/n): " SETUP_UFW
 
-# Stop and remove existing Story node
+# Service Name Configuration (for multi-instance support)
+if [ -z "$STORY_SERVICE_NAME" ]; then
+    read -p "Enter Consensus Service Name (default 'story'): " STORY_SERVICE_NAME
+    STORY_SERVICE_NAME=${STORY_SERVICE_NAME:-story}
+fi
+
+if [ -z "$STORY_GETH_SERVICE_NAME" ]; then
+    read -p "Enter Geth Service Name (default 'story-geth'): " STORY_GETH_SERVICE_NAME
+    STORY_GETH_SERVICE_NAME=${STORY_GETH_SERVICE_NAME:-story-geth}
+fi
+
+echo "Using Service Names: ${STORY_SERVICE_NAME} and ${STORY_GETH_SERVICE_NAME}"
+
+# Stop and remove existing Story node (uses custom service names)
 sudo systemctl daemon-reload
-sudo systemctl stop story story-geth  2>/dev/null || true
-sudo systemctl disable story  2>/dev/null || true
-sudo systemctl disable story-geth  2>/dev/null || true
-sudo rm -rf /etc/systemd/system/story.service  2>/dev/null || true
-sudo rm -rf /etc/systemd/system/story-geth.service  2>/dev/null || true
+sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}  2>/dev/null || true
+sudo systemctl disable ${STORY_SERVICE_NAME}  2>/dev/null || true
+sudo systemctl disable ${STORY_GETH_SERVICE_NAME}  2>/dev/null || true
+sudo rm -rf /etc/systemd/system/${STORY_SERVICE_NAME}.service  2>/dev/null || true
+sudo rm -rf /etc/systemd/system/${STORY_GETH_SERVICE_NAME}.service  2>/dev/null || true
 sudo rm -r $HOME/go/bin/story  2>/dev/null || true
 sudo rm -r $HOME/go/bin/story-geth $HOME/go/bin/geth  2>/dev/null || true
 sudo rm -rf $HOME/.story  2>/dev/null || true
@@ -170,9 +183,9 @@ echo "Backup directory: $input3"
 # 13. Create systemd service files for the consensus and Geth clients
 
 # Consensus service file
-sudo tee /etc/systemd/system/story.service > /dev/null <<EOF
+sudo tee /etc/systemd/system/${STORY_SERVICE_NAME}.service > /dev/null <<EOF
 [Unit]
-Description=Cosmovisor Story Node
+Description=Cosmovisor Story Node (${STORY_SERVICE_NAME})
 After=network.target
 
 [Service]
@@ -198,9 +211,9 @@ WantedBy=multi-user.target
 EOF
 
 # Geth service file
-sudo tee /etc/systemd/system/story-geth.service > /dev/null <<EOF
+sudo tee /etc/systemd/system/${STORY_GETH_SERVICE_NAME}.service > /dev/null <<EOF
 [Unit]
-Description=Story Geth Node
+Description=Story Geth Node (${STORY_GETH_SERVICE_NAME})
 After=network-online.target
 
 [Service]
@@ -217,17 +230,21 @@ LimitNPROC=65536
 WantedBy=multi-user.target
 EOF
 
+# Save service names to bash_profile for valleyofStory.sh
+echo "export STORY_SERVICE_NAME=\"${STORY_SERVICE_NAME}\"" >> $HOME/.bash_profile
+echo "export STORY_GETH_SERVICE_NAME=\"${STORY_GETH_SERVICE_NAME}\"" >> $HOME/.bash_profile
+
 # 14. Start the node
 sudo systemctl daemon-reload
-sudo systemctl enable story-geth story
-sudo systemctl restart story-geth story
+sudo systemctl enable ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
+sudo systemctl restart ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
 
 # 15. Confirmation message for installation completion
-if systemctl is-active --quiet story && systemctl is-active --quiet story-geth; then
+if systemctl is-active --quiet ${STORY_SERVICE_NAME} && systemctl is-active --quiet ${STORY_GETH_SERVICE_NAME}; then
     echo "Node installation and services started successfully!"
 else
     echo "Node installation failed. Please check the logs for more information."
 fi
 
 # show the full logs
-echo "sudo journalctl -u story-geth -u story -fn 100"
+echo "sudo journalctl -u ${STORY_GETH_SERVICE_NAME} -u ${STORY_SERVICE_NAME} -fn 100"

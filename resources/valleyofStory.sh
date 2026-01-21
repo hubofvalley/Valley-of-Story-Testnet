@@ -9,6 +9,24 @@ YELLOW='\033[0;33m'
 ORANGE='\033[38;5;214m'
 RESET='\033[0m'
 
+# Service Name Detection - Ask Once, Remember Forever
+source $HOME/.bash_profile 2>/dev/null
+
+if [ -z "$STORY_SERVICE_NAME" ]; then
+    echo -e "${YELLOW}Service name configuration not found.${RESET}"
+    read -p "Enter Consensus Service Name (default 'story'): " INPUT_SVC
+    STORY_SERVICE_NAME=${INPUT_SVC:-story}
+    echo "export STORY_SERVICE_NAME=\"$STORY_SERVICE_NAME\"" >> $HOME/.bash_profile
+    export STORY_SERVICE_NAME
+fi
+
+if [ -z "$STORY_GETH_SERVICE_NAME" ]; then
+    read -p "Enter Geth Service Name (default 'story-geth'): " INPUT_GETH
+    STORY_GETH_SERVICE_NAME=${INPUT_GETH:-story-geth}
+    echo "export STORY_GETH_SERVICE_NAME=\"$STORY_GETH_SERVICE_NAME\"" >> $HOME/.bash_profile
+    export STORY_GETH_SERVICE_NAME
+fi
+
 LOGO="
  __      __     _  _                        __    _____  _
  \ \    / /    | || |                      / _|  / ____|| |
@@ -38,8 +56,8 @@ ${YELLOW}| Category  | Requirements     |
 | Storage   | 500+ GB NVMe SSD |
 | Bandwidth | 100+ MBit/s      |${RESET}
 
-- consensus client service file name: ${CYAN}story.service${RESET}
-- geth service file name: ${CYAN}story-geth.service${RESET}
+- consensus client service file name: ${CYAN}${STORY_SERVICE_NAME}.service${RESET}
+- geth service file name: ${CYAN}${STORY_GETH_SERVICE_NAME}.service${RESET}
 - current chain: ${CYAN}aeneid${RESET}
 - current story node version: ${CYAN}v1.4.2${RESET}
 - current story-geth node version: ${CYAN}v1.2.0${RESET}
@@ -452,10 +470,10 @@ function export_evm_key() {
 }
 
 function delete_validator_node() {
-    sudo systemctl stop story story-geth
-    sudo systemctl disable story story-geth
-    sudo rm -rf /etc/systemd/system/story.service
-    sudo rm -rf /etc/systemd/system/story-geth.service
+    sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
+    sudo systemctl disable ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
+    sudo rm -rf /etc/systemd/system/${STORY_SERVICE_NAME}.service
+    sudo rm -rf /etc/systemd/system/${STORY_GETH_SERVICE_NAME}.service
     sudo rm -r $HOME/go/bin/story
     sudo rm -r $HOME/go/bin/story-geth $HOME/go/bin/geth
     sudo rm -rf $HOME/.story
@@ -466,14 +484,14 @@ function delete_validator_node() {
 
 function stop_validator_node() {
     sudo systemctl daemon-reload
-    sudo systemctl stop story story-geth
+    sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
     echo "Consensus client and Geth service stopped."
     menu
 }
 
 function restart_validator_node() {
     sudo systemctl daemon-reload
-    sudo systemctl restart story story-geth
+    sudo systemctl restart ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
     echo -e "\n${GREEN}Consensus client and Geth service restarted.${RESET}"
     menu
 }
@@ -590,14 +608,14 @@ function migrate_to_cosmovisor() {
 # New functions for stopping and restarting individual services
 function stop_consensus_client() {
     sudo systemctl daemon-reload
-    sudo systemctl stop story
+    sudo systemctl stop ${STORY_SERVICE_NAME}
     echo "Consensus client service stopped."
     menu
 }
 
 function stop_geth() {
     sudo systemctl daemon-reload
-    sudo systemctl stop story-geth
+    sudo systemctl stop ${STORY_GETH_SERVICE_NAME}
     echo "Geth service stopped."
     menu
 }
@@ -607,7 +625,7 @@ function schedule_validator_node() {
     echo -e "${GREEN}- Run:${RESET} sudo apt-get update"
     echo -e "${GREEN}- Install dependency:${RESET} at"
     echo -e "${GREEN}- Enable and start:${RESET} atd (scheduler service)"
-    echo -e "${GREEN}- Schedule:${RESET} stop/disable or restart/enable for ${CYAN}story.service${RESET} + ${CYAN}story-geth.service${RESET} via ${ORANGE}at${RESET}"
+    echo -e "${GREEN}- Schedule:${RESET} stop/disable or restart/enable for ${CYAN}${STORY_SERVICE_NAME}.service${RESET} + ${CYAN}${STORY_GETH_SERVICE_NAME}.service${RESET} via ${ORANGE}at${RESET}"
     echo -e "${GREEN}- List or remove:${RESET} scheduled jobs from the at queue"
     echo -e "\n${YELLOW}Press Enter to continue...${RESET}"
     read -r
@@ -617,33 +635,33 @@ function schedule_validator_node() {
 
 function restart_consensus_client() {
     sudo systemctl daemon-reload
-    sudo systemctl restart story
+    sudo systemctl restart ${STORY_SERVICE_NAME}
     echo "Consensus client service restarted."
     menu
 }
 
 function restart_geth() {
     sudo systemctl daemon-reload
-    sudo systemctl restart story-geth
+    sudo systemctl restart ${STORY_GETH_SERVICE_NAME}
     echo "Geth service restarted."
     menu
 }
 
 function show_all_logs() {
     echo "Displaying both Consensus Client and Geth Logs:"
-    sudo journalctl -u story -u story-geth -fn 100
+    sudo journalctl -u ${STORY_SERVICE_NAME} -u ${STORY_GETH_SERVICE_NAME} -fn 100
     menu
 }
 
 function show_consensus_client_logs() {
     echo "Displaying Consensus Client Logs:"
-    sudo journalctl -u story -fn 100
+    sudo journalctl -u ${STORY_SERVICE_NAME} -fn 100
     menu
 }
 
 function show_geth_logs() {
     echo "Displaying Geth Logs:"
-    sudo journalctl -u story-geth -fn 100
+    sudo journalctl -u ${STORY_GETH_SERVICE_NAME} -fn 100
     menu
 }
 
