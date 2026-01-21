@@ -10,6 +10,11 @@ fi
 # Define variables
 geth_file_name=geth-linux-amd64
 
+# Load service name configuration
+source $HOME/.bash_profile 2>/dev/null
+STORY_SERVICE_NAME=${STORY_SERVICE_NAME:-story}
+STORY_GETH_SERVICE_NAME=${STORY_GETH_SERVICE_NAME:-story-geth}
+
 # Function to update to a specific version
 update_version() {
     local version=$1
@@ -33,7 +38,7 @@ update_version() {
             echo "Build failed. Exiting."
             exit 1
         fi
-        sudo systemctl stop story story-geth
+        sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
         if ! cp build/bin/geth "$HOME/go/bin/"; then
             echo "Failed to copy binary. Exiting."
             exit 1
@@ -47,7 +52,7 @@ update_version() {
             echo "Failed to download the binary. Exiting."
             exit 1
         fi
-        sudo systemctl stop story story-geth
+        sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
         sudo mv "$HOME/story-geth-$version/geth" "$HOME/go/bin/geth"
         sudo chown -R "$USER:$USER" "$HOME/go/bin/geth"
         sudo chmod +x "$HOME/go/bin/geth"
@@ -57,7 +62,7 @@ update_version() {
     fi
 
     sudo systemctl daemon-reload
-    sudo systemctl restart story-geth && sleep 5 && sudo systemctl restart story
+    sudo systemctl restart ${STORY_GETH_SERVICE_NAME} && sleep 5 && sudo systemctl restart ${STORY_SERVICE_NAME}
 }
 
 # Menu for selecting the version

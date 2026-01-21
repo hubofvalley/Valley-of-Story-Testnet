@@ -9,6 +9,11 @@ YELLOW=$'\033[0;33m'
 ORANGE=$'\033[38;5;214m'
 RESET=$'\033[0m'
 
+# Load service name configuration
+source $HOME/.bash_profile 2>/dev/null
+STORY_SERVICE_NAME=${STORY_SERVICE_NAME:-story}
+STORY_GETH_SERVICE_NAME=${STORY_GETH_SERVICE_NAME:-story-geth}
+
 LOG_DIR="$HOME/.story"
 LOG_FILE="$LOG_DIR/story_schedule_jobs.log"
 
@@ -218,7 +223,7 @@ while true; do
             pause_return
             ;;
         2)
-            if ! schedule_jobs "stop/disable" $'systemctl stop story story-geth\nsystemctl disable story story-geth'; then
+            if ! schedule_jobs "stop/disable" $'systemctl stop '"${STORY_SERVICE_NAME}"' '"${STORY_GETH_SERVICE_NAME}"'\nsystemctl disable '"${STORY_SERVICE_NAME}"' '"${STORY_GETH_SERVICE_NAME}"''; then
                 rc=$?
                 if (( rc == 2 )); then
                     echo -e "${YELLOW}Returning to main menu...${RESET}"
@@ -230,7 +235,7 @@ while true; do
             pause_return
             ;;
         3)
-            if ! schedule_jobs "restart/enable" $'systemctl daemon-reload\nsystemctl enable story story-geth\nsystemctl restart story story-geth'; then
+            if ! schedule_jobs "restart/enable" $'systemctl daemon-reload\nsystemctl enable '"${STORY_SERVICE_NAME}"' '"${STORY_GETH_SERVICE_NAME}"'\nsystemctl restart '"${STORY_SERVICE_NAME}"' '"${STORY_GETH_SERVICE_NAME}"''; then
                 rc=$?
                 if (( rc == 2 )); then
                     echo -e "${YELLOW}Returning to main menu...${RESET}"

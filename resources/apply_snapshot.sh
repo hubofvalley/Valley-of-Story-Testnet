@@ -7,6 +7,11 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Load service name configuration
+source $HOME/.bash_profile 2>/dev/null
+STORY_SERVICE_NAME=${STORY_SERVICE_NAME:-story}
+STORY_GETH_SERVICE_NAME=${STORY_GETH_SERVICE_NAME:-story-geth}
+
 # Snapshot URLs
 
 # Grand Valley Snapshot URLs (dynamic, use API for filenames)
@@ -605,8 +610,8 @@ main_script() {
     sudo apt-get install wget lz4 jq -y
 
     # Stop your story-geth and story nodes
-    sudo systemctl stop story-geth story
-    sudo systemctl disable story-geth story
+    sudo systemctl stop ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
+    sudo systemctl disable ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
 
     # Back up your validator state
     cp $HOME/.story/story/data/priv_validator_state.json $HOME/.story/priv_validator_state.json.backup
@@ -654,8 +659,8 @@ main_script() {
     fi
 
     # Start your story-geth and story nodes
-    sudo systemctl enable story-geth story
-    sudo systemctl restart story-geth story
+    sudo systemctl enable ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
+    sudo systemctl restart ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
 
     echo -e "${GREEN}Snapshot setup completed successfully.${NC}"
 }

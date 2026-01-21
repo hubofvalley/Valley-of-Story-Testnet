@@ -8,6 +8,11 @@ CYAN='\033[0;36m'
 YELLOW='\033[0;33m'
 RESET='\033[0m'
 
+# Load service name configuration
+source $HOME/.bash_profile 2>/dev/null
+STORY_SERVICE_NAME=${STORY_SERVICE_NAME:-story}
+STORY_GETH_SERVICE_NAME=${STORY_GETH_SERVICE_NAME:-story-geth}
+
 # Function to install cosmovisor
 install_cosmovisor() {
     echo "Installing cosmovisor..."
@@ -46,7 +51,7 @@ init_cosmovisor() {
 
 # Function to initialize cosmovisor
 init_cosmovisor110() {
-    sudo systemctl stop story story-geth
+    sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
 
     # Download genesis story version
     mkdir -p story-v1.4.2
@@ -63,7 +68,7 @@ init_cosmovisor110() {
     sudo rm -r $HOME/.story/story/data/upgrade-info.json
     mkdir -p $HOME/.story/story/cosmovisor/upgrades
     mkdir -p $HOME/.story/story/cosmovisor/backup
-    sudo systemctl restart story story-geth
+    sudo systemctl restart ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
 }
 
 # Ask the user if cosmovisor is installed

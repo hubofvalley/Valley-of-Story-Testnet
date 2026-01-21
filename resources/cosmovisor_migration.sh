@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Load service name configuration
+source $HOME/.bash_profile 2>/dev/null
+STORY_SERVICE_NAME=${STORY_SERVICE_NAME:-story}
+STORY_GETH_SERVICE_NAME=${STORY_GETH_SERVICE_NAME:-story-geth}
+
 # Function to install cosmovisor
 install_cosmovisor() {
     echo "Installing cosmovisor..."
@@ -98,6 +103,6 @@ EOF
 
 # Reload and Restart systemd to apply changes
 sudo systemctl daemon-reload
-sudo systemctl restart story
+sudo systemctl restart ${STORY_SERVICE_NAME}
 
 echo "Cosmovisor migration completed successfully."
