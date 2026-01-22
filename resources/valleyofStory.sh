@@ -92,7 +92,8 @@ Grand Valley Story Protocol public endpoints:${RESET}
 - cosmos rest-api: ${BLUE}https://lightnode-api-story.grandvalleys.com${RESET}
 - cosmos ws: ${BLUE}wss://lightnode-rpc-story.grandvalleys.com/websocket${RESET}
 - evm ws: ${BLUE}wss://lightnode-wss-story.grandvalleys.com${RESET}
-- peer: ${BLUE}7e311e22cff1a0d39c3758e342fa4c2ee1aea461@peer-story.grandvalleys.com:28656${RESET}
+- peer: ${BLUE}7e311e22cff1a0d39c3758e342fa4c2ee1aea461@peer-story.grandvalleys.com:29656${RESET}
+- enode: ${BLUE}enode://4e5e22f7d44a2642a08e5bd86595f1457fc89e828028467a6ebf8623267e7dc5db9ecb4a08b566e631a383be92cfc620d73ff6427e7255867113b9406cd189cc@enode-story.grandvalleys.com:29303${RESET}
 
 ${GREEN}Grand Valley Story Testnet validator profile links:${RESET}
     - ${ORANGE}https://aeneid.staking.story.foundation/validators/0x1b5452a212db06F6D6879C292157396B6dCa44d7${RESET}
