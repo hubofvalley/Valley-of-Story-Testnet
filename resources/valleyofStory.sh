@@ -123,7 +123,8 @@ echo -e "$ENDPOINTS"
 echo -e "\n${YELLOW}Press Enter to continue${RESET}"
 read -r
 echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin' >> ~/.bash_profile
-echo "export STORY_CHAIN_ID="aeneid"" >> ~/.bash_profile
+echo "export STORY_CHAIN_ID=1315" >> ~/.bash_profile
+echo "export STORY_NETWORK_NAME=aeneid" >> ~/.bash_profile
 echo "export DAEMON_NAME=story" >> ~/.bash_profile
 echo "export DAEMON_HOME=$(find "$HOME/.story/story" -type d -name "story" -print -quit)" >> ~/.bash_profile
 echo "export DAEMON_DATA_BACKUP_DIR=$(find "$HOME/.story/story/cosmovisor" -type d -name "backup" -print -quit)" >> ~/.bash_profile
@@ -203,20 +204,63 @@ function create_validator() {
         sudo apt-get install bc
     fi
 
-    read -p "Enter your private key (or press Enter to use local private key): " PRIVATE_KEY
-    if [ -z "$PRIVATE_KEY" ]; then
-        PRIVATE_KEY=$(grep -oP '(?<=PRIVATE_KEY=).*' $HOME/.story/story/config/private_key.txt)
+    # Encrypted key file path
+    ENC_KEY_FILE="$HOME/.story/story/config/priv_validator_key.enc"
+
+    # Check if encrypted key exists
+    if [ ! -f "$ENC_KEY_FILE" ]; then
+        echo -e "${YELLOW}No encrypted private key found at $ENC_KEY_FILE${RESET}"
+        echo -e "${CYAN}Would you like to encrypt your existing private key? (recommended for security)${RESET}"
+        read -p "Enter your choice (yes/no): " ENCRYPT_CHOICE
+        
+        if [[ "${ENCRYPT_CHOICE,,}" == "yes" ]]; then
+            # Read existing private key
+            PRIVATE_KEY=$(grep -oP '(?<=PRIVATE_KEY=).*' $HOME/.story/story/config/private_key.txt 2>/dev/null)
+            if [ -z "$PRIVATE_KEY" ]; then
+                read -p "Enter your private key: " PRIVATE_KEY
+            fi
+            
+            if [ -z "$PRIVATE_KEY" ]; then
+                echo -e "${RED}Error: No private key found or provided.${RESET}"
+                menu
+                return
+            fi
+            
+            # Create temporary .env file in story home directory
+            echo "PRIVATE_KEY=$PRIVATE_KEY" > $HOME/.env
+            
+            echo -e "${GREEN}Running Story CLI encryption...${RESET}"
+            echo -e "${YELLOW}You will be prompted to create a password for your encrypted key.${RESET}"
+            story key encrypt --enc-key-file "$ENC_KEY_FILE" --chain-id "$STORY_CHAIN_ID"
+            
+            # Cleanup: remove plaintext .env file after encryption
+            rm -f $HOME/.env
+            
+            if [ ! -f "$ENC_KEY_FILE" ]; then
+                echo -e "${RED}Encryption failed or cancelled. Cannot proceed without encrypted key.${RESET}"
+                menu
+                return
+            fi
+            echo -e "${GREEN}Private key encrypted successfully!${RESET}"
+        else
+            echo -e "${RED}Cannot proceed without encrypted key. Please encrypt your key first.${RESET}"
+            menu
+            return
+        fi
     fi
 
-    echo "PRIVATE_KEY=$PRIVATE_KEY" > $HOME/.story/story/.env
+    echo -e "${GREEN}Using encrypted key file: $ENC_KEY_FILE${RESET}"
 
     read -p "Enter the moniker for your validator: " MONIKER
 
     read -p "Enter the amount to be staked in IP (e.g., 1024 for 1024 IP, minimum requirement is 1024 IP): " STAKE_IP
 
-    # Validate minimum stake
+    # Replace comma with dot if present (handle European decimal format)
+    STAKE_IP="${STAKE_IP//,/.}"
+
+    # Validate minimum stake using bc to handle floating point numbers
     MIN_STAKE=1024
-    if [ "$STAKE_IP" -lt "$MIN_STAKE" ]; then
+    if (( $(echo "$STAKE_IP < $MIN_STAKE" | bc -l) )); then
         echo "The stake amount is below the minimum requirement of 1024 IP."
         menu
         return
@@ -274,16 +318,18 @@ function create_validator() {
 
     # Convert the stake from IP to the required unit format
     STAKE=$(echo "$STAKE_IP * 10^18" | bc)
+    STAKE=${STAKE%%.*}
 
     story validator create \
         --stake "$STAKE" \
         --moniker "$MONIKER" \
-        --enc-key-file "$HOME/.story/story/.env" \
-        --chain-id 1315 \
+        --chain-id "$STORY_CHAIN_ID" \
         --unlocked="$UNLOCKED_FLAG" \
         --commission-rate "$COMMISSION_RATE" \
         --max-commission-change-rate "$MAX_COMMISSION_CHANGE_RATE" \
         --max-commission-rate "$MAX_COMMISSION_RATE" \
+        --enc-key-file "$ENC_KEY_FILE" \
+        --keyfile "$HOME/.story/story/config/priv_validator_key.json" \
         --rpc "https://aeneid.storyrpc.io"
         
     menu
@@ -338,7 +384,7 @@ function query_balance() {
 }
 
 function stake_tokens() {
-    # Check if bc is installed, if not, install it
+    # Check if bc is installed
     if ! command -v bc &> /dev/null; then
         echo "bc is not installed. Installing bc..."
         sudo apt-get update
@@ -380,19 +426,42 @@ function stake_tokens() {
 
     # Convert IP to the required format (assuming 1 IP = 10^18 units)
     AMOUNT=$(echo "$AMOUNT_IP * 10^18" | bc)
+    AMOUNT=${AMOUNT%%.*}
 
-    read -p "Enter private key (leave blank to use local private key): " PRIVATE_KEY
-
-    if [ -n "$PRIVATE_KEY" ]; then
-        PRIVATE_KEY_FLAG="--private-key $PRIVATE_KEY"
-    else
-        PRIVATE_KEY_FLAG="--private-key $(grep -oP '(?<=PRIVATE_KEY=).*' $HOME/.story/story/config/private_key.txt)"
+    # Encrypted KEY workflow
+    ENC_KEY_FILE="$HOME/.story/story/config/priv_validator_key.enc"
+    if [ ! -f "$ENC_KEY_FILE" ]; then
+        echo -e "${YELLOW}No encrypted private key found.${RESET}"
+        read -p "Do you want to encrypt your key now? (yes/no): " ENCRYPT_CHOICE
+        if [[ "${ENCRYPT_CHOICE,,}" == "yes" ]]; then
+             # Read existing private key
+            PRIVATE_KEY=$(grep -oP '(?<=PRIVATE_KEY=).*' $HOME/.story/story/config/private_key.txt 2>/dev/null)
+            if [ -z "$PRIVATE_KEY" ]; then
+                read -p "Enter your private key: " PRIVATE_KEY
+            fi
+            
+            if [ -z "$PRIVATE_KEY" ]; then
+                echo -e "${RED}Error: No private key found or provided.${RESET}"
+                menu
+                return
+            fi
+            
+            # Create temporary .env file
+            echo "PRIVATE_KEY=$PRIVATE_KEY" > $HOME/.env
+            
+            story key encrypt --enc-key-file "$ENC_KEY_FILE" --chain-id "$STORY_CHAIN_ID"
+            rm -f $HOME/.env
+        else
+            echo -e "${RED}Operation cancelled. Encrypted key required.${RESET}"
+            menu
+            return
+        fi
     fi
 
     if [ "$RPC_CHOICE" == "2" ]; then
-        story validator stake --validator-pubkey $VALIDATOR_PUBKEY --stake $AMOUNT $PRIVATE_KEY_FLAG --rpc https://lightnode-json-rpc-story.grandvalleys.com:443 --chain-id 1315
+        story validator stake --validator-pubkey $VALIDATOR_PUBKEY --stake $AMOUNT --enc-key-file "$ENC_KEY_FILE" --rpc https://lightnode-json-rpc-story.grandvalleys.com:443 --chain-id "$STORY_CHAIN_ID"
     elif [ "$RPC_CHOICE" == "1" ]; then
-        story validator stake --validator-pubkey $VALIDATOR_PUBKEY --stake $AMOUNT $PRIVATE_KEY_FLAG --chain-id 1315
+        story validator stake --validator-pubkey $VALIDATOR_PUBKEY --stake $AMOUNT --enc-key-file "$ENC_KEY_FILE" --chain-id "$STORY_CHAIN_ID"
     else
         echo "Invalid choice. Please select a valid option."
         stake_tokens
@@ -402,7 +471,7 @@ function stake_tokens() {
 }
 
 function unstake_tokens() {
-    # Check if bc is installed, if not, install it
+    # Check if bc is installed
     if ! command -v bc &> /dev/null; then
         echo "bc is not installed. Installing bc..."
         sudo apt-get update
@@ -440,19 +509,42 @@ function unstake_tokens() {
 
     # Convert IP to the required format (assuming 1 IP = 10^18 units)
     AMOUNT=$(echo "$AMOUNT_IP * 10^18" | bc)
+    AMOUNT=${AMOUNT%%.*}
 
-    read -p "Enter private key (leave blank to use local private key): " PRIVATE_KEY
-
-    if [ -n "$PRIVATE_KEY" ]; then
-        PRIVATE_KEY_FLAG="--private-key $PRIVATE_KEY"
-    else
-        PRIVATE_KEY_FLAG="--private-key $(grep -oP '(?<=PRIVATE_KEY=).*' $HOME/.story/story/config/private_key.txt)"
+    # Encrypted KEY workflow
+    ENC_KEY_FILE="$HOME/.story/story/config/priv_validator_key.enc"
+    if [ ! -f "$ENC_KEY_FILE" ]; then
+        echo -e "${YELLOW}No encrypted private key found.${RESET}"
+        read -p "Do you want to encrypt your key now? (yes/no): " ENCRYPT_CHOICE
+        if [[ "${ENCRYPT_CHOICE,,}" == "yes" ]]; then
+             # Read existing private key
+            PRIVATE_KEY=$(grep -oP '(?<=PRIVATE_KEY=).*' $HOME/.story/story/config/private_key.txt 2>/dev/null)
+            if [ -z "$PRIVATE_KEY" ]; then
+                read -p "Enter your private key: " PRIVATE_KEY
+            fi
+            
+            if [ -z "$PRIVATE_KEY" ]; then
+                echo -e "${RED}Error: No private key found or provided.${RESET}"
+                menu
+                return
+            fi
+            
+            # Create temporary .env file
+            echo "PRIVATE_KEY=$PRIVATE_KEY" > $HOME/.env
+            
+            story key encrypt --enc-key-file "$ENC_KEY_FILE" --chain-id "$STORY_CHAIN_ID"
+            rm -f $HOME/.env
+        else
+            echo -e "${RED}Operation cancelled. Encrypted key required.${RESET}"
+            menu
+            return
+        fi
     fi
 
     if [ "$RPC_CHOICE" == "2" ]; then
-        story validator unstake --validator-pubkey $VALIDATOR_PUBKEY --unstake $AMOUNT $PRIVATE_KEY_FLAG --rpc https://lightnode-json-rpc-story.grandvalleys.com:443 --chain-id 1315
+        story validator unstake --validator-pubkey $VALIDATOR_PUBKEY --unstake $AMOUNT --enc-key-file "$ENC_KEY_FILE" --rpc https://lightnode-json-rpc-story.grandvalleys.com:443 --chain-id "$STORY_CHAIN_ID"
     elif [ "$RPC_CHOICE" == "1" ]; then
-        story validator unstake --validator-pubkey $VALIDATOR_PUBKEY --unstake $AMOUNT $PRIVATE_KEY_FLAG --chain-id 1315
+        story validator unstake --validator-pubkey $VALIDATOR_PUBKEY --unstake $AMOUNT --enc-key-file "$ENC_KEY_FILE" --chain-id "$STORY_CHAIN_ID"
     else
         echo "Invalid choice. Please select a valid option."
         unstake_tokens
@@ -463,9 +555,20 @@ function unstake_tokens() {
 
 function export_evm_key() {
     echo -e "${CYAN}Query all of your current EVM key addresses including your EVM private key${RESET}"
-    story validator export --evm-key-path $HOME/.story/story/config/private_key.txt --export-evm-key
-    cat $HOME/.story/story/config/private_key.txt
-    echo -e "\n${YELLOW}Press Enter to continue${RESET}"
+    
+    # Use mktemp for secure temporary file creation
+    TEMP_KEY_FILE=$(mktemp)
+    
+    story validator export --evm-key-path "$TEMP_KEY_FILE" --export-evm-key
+    
+    echo -e "\n${YELLOW}Your EVM Private Key:${RESET}"
+    grep -oP '(?<=PRIVATE_KEY=).*' "$TEMP_KEY_FILE"
+    
+    # Securely delete the temporary file
+    rm -f "$TEMP_KEY_FILE"
+    
+    echo -e "\n${GREEN}Temporary key file has been securely deleted.${RESET}"
+    echo -e "${YELLOW}Press Enter to continue${RESET}"
     read -r
     menu
 }
@@ -673,7 +776,7 @@ function install_story_app() {
     cp story-v1.4.2/story $HOME/go/bin/story
     sudo chown -R $USER:$USER $HOME/go/bin/story
     sudo chmod +x $HOME/go/bin/story
-    story init --network $STORY_CHAIN_ID --moniker gv-story
+    story init --network $STORY_NETWORK_NAME --moniker gv-story --encrypt-priv-key
     echo -e "${YELLOW}story app installed successfully${RESET}"
     menu
 }
