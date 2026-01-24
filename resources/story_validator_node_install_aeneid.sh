@@ -149,11 +149,7 @@ else
     echo "Indexer disabled."
 fi
 
-# 10. Export Private key
-story validator export --evm-key-path $HOME/.story/story/config/private_key.txt --export-evm-key
-PRIVATE_KEY=$(grep -oP '(?<=PRIVATE_KEY=).*' $HOME/.story/story/config/private_key.txt)
-
-# 11. Initialize Cosmovisor and create a symlink to the latest consensus client version in the Go directory
+# 10. Initialize Cosmovisor and create a symlink to the latest consensus client version in the Go directory
 echo "export DAEMON_NAME=story" >> $HOME/.bash_profile
 echo "export DAEMON_HOME=$(find "$HOME/.story/story" -type d -name "story" -print -quit)" >> $HOME/.bash_profile
 source $HOME/.bash_profile
@@ -168,7 +164,7 @@ mkdir -p $HOME/.story/story/cosmovisor/upgrades
 mkdir -p $HOME/.story/story/cosmovisor/backup
 cd $HOME
 
-# 12. Define Cosmovisor paths for the consensus client
+# 11. Define Cosmovisor paths for the consensus client
 input1=$(which cosmovisor)
 input2=$(find "$HOME/.story/story" -type d -name "story" -print -quit)
 input3=$(find "$HOME/.story/story/cosmovisor" -type d -name "backup" -print -quit)
@@ -180,7 +176,7 @@ echo "Cosmovisor path: $input1"
 echo "Story home: $input2"
 echo "Backup directory: $input3"
 
-# 13. Create systemd service files for the consensus and Geth clients
+# 12. Create systemd service files for the consensus and Geth clients
 
 # Consensus service file
 sudo tee /etc/systemd/system/${STORY_SERVICE_NAME}.service > /dev/null <<EOF
@@ -234,12 +230,12 @@ EOF
 echo "export STORY_SERVICE_NAME=\"${STORY_SERVICE_NAME}\"" >> $HOME/.bash_profile
 echo "export STORY_GETH_SERVICE_NAME=\"${STORY_GETH_SERVICE_NAME}\"" >> $HOME/.bash_profile
 
-# 14. Start the node
+# 13. Start the node
 sudo systemctl daemon-reload
 sudo systemctl enable ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
 sudo systemctl restart ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
 
-# 15. Confirmation message for installation completion
+# 14. Confirmation message for installation completion
 if systemctl is-active --quiet ${STORY_SERVICE_NAME} && systemctl is-active --quiet ${STORY_GETH_SERVICE_NAME}; then
     echo "Node installation and services started successfully!"
 else
