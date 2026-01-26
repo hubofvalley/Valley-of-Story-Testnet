@@ -538,6 +538,54 @@ function export_evm_key() {
     menu
 }
 
+function check_foundry() {
+    if ! command -v cast &> /dev/null; then
+        echo "Foundry (cast) is not installed. Installing..."
+        curl -L https://foundry.paradigm.xyz | bash
+        export PATH="$HOME/.foundry/bin:$PATH"
+        source $HOME/.bashrc 2>/dev/null
+        foundryup
+    fi
+}
+
+function send_ip_token() {
+    check_foundry
+    
+    echo -e "${CYAN}Send IP Token${RESET}"
+    echo -e "${YELLOW}This uses the EVM RPC to transfer native IP tokens.${RESET}"
+    
+    read -p "Enter Recipient Address (0x...): " RECIPIENT
+    read -p "Enter Amount (IP): " AMOUNT
+    
+    # Key management: Check local key or ask user
+    PRIVATE_KEY=$(grep -oP '(?<=PRIVATE_KEY=).*' $HOME/.story/story/config/private_key.txt 2>/dev/null)
+    
+    if [ -z "$PRIVATE_KEY" ]; then
+        echo -e "${YELLOW}Private key not found automatically.${RESET}"
+        read -s -p "Enter your private key (hidden input): " PRIVATE_KEY
+        echo ""
+    fi
+    
+    if [ -z "$PRIVATE_KEY" ]; then
+        echo -e "${RED}Error: Private key is required to proceed.${RESET}"
+        menu
+        return
+    fi
+    
+    echo -e "${YELLOW}Sending ${AMOUNT} IP to ${RECIPIENT}...${RESET}"
+    
+    # cast send handles the value conversion with 'ether' unit for 18 decimals
+    # using the testnet EVM RPC
+    # adding path to ensure cast is found if just installed
+    export PATH="$HOME/.foundry/bin:$PATH"
+    
+    cast send --rpc-url https://aeneid.storyrpc.io --private-key "$PRIVATE_KEY" --value "${AMOUNT}ether" "$RECIPIENT"
+    
+    echo -e "\n${YELLOW}Press Enter to return to menu${RESET}"
+    read -r
+    menu
+}
+
 function delete_validator_node() {
     sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
     sudo systemctl disable ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
@@ -868,6 +916,7 @@ function menu() {
     echo "   e. Unstake Tokens"
     echo "   f. Export EVM Key"
     echo "   g. Redelegate Tokens"
+    echo "   h. Send IP Token"
     echo -e "${GREEN}3. Node Management:${RESET}"
     echo "   a. Restart Validator Node"
     echo "   b. Restart Consensus Client Only"
@@ -925,6 +974,7 @@ function menu() {
                 e) unstake_tokens ;;
                 f) export_evm_key ;;
                 g) redelegate_tokens ;;
+                h) send_ip_token ;;
                 *) echo "Invalid sub-option. Please try again." ;;
             esac
             ;;
