@@ -505,6 +505,109 @@ function unstake_tokens() {
     menu
 }
 
+function redelegate_tokens() {
+    # Check if bc is installed
+    if ! command -v bc &> /dev/null; then
+        echo "bc is not installed. Installing bc..."
+        sudo apt-get update
+        sudo apt-get install bc
+    fi
+
+    echo "Choose the source validator to redelegate FROM:"
+    echo "1. Redelegate from self"
+    echo "2. Redelegate from another validator"
+    echo "3. Back"
+    read -p "Enter your choice (1/2/3): " SRC_CHOICE
+
+    case $SRC_CHOICE in
+        1)
+            SRC_VALIDATOR_PUBKEY=$(story validator export | grep -oP 'Compressed Public Key \(hex\): \K[0-9a-fA-F]+')
+            ;;
+        2)
+            read -p "Enter source validator pubkey: " SRC_VALIDATOR_PUBKEY
+            ;;
+        3)
+            menu
+            return
+            ;;
+        *)
+            echo "Invalid choice. Please select a valid option."
+            redelegate_tokens
+            return
+            ;;
+    esac
+
+    echo "Choose the destination validator to redelegate TO:"
+    echo "1. Redelegate to Grand Valley"
+    echo "2. Redelegate to self"
+    echo "3. Redelegate to another validator"
+    echo "4. Back"
+    read -p "Enter your choice (1/2/3/4): " DST_CHOICE
+
+    case $DST_CHOICE in
+        1)
+            DST_VALIDATOR_PUBKEY="0314a9224a61686b5792d2f9f45fd28bd088cc7fa42be60ad1e12fe9540af39f64"
+            ;;
+        2)
+            DST_VALIDATOR_PUBKEY=$(story validator export | grep -oP 'Compressed Public Key \(hex\): \K[0-9a-fA-F]+')
+            ;;
+        3)
+            read -p "Enter destination validator pubkey: " DST_VALIDATOR_PUBKEY
+            ;;
+        4)
+            menu
+            return
+            ;;
+        *)
+            echo "Invalid choice. Please select a valid option."
+            redelegate_tokens
+            return
+            ;;
+    esac
+
+    echo "Choose the RPC to use:"
+    echo "1. Use default RPC"
+    echo "2. Use Grand Valley's RPC"
+    read -p "Enter your choice (1/2): " RPC_CHOICE
+
+    read -p "Enter the amount to redelegate in IP (e.g., 1024 for 1024 IP): " AMOUNT_IP
+
+    # Convert IP to the required format (assuming 1 IP = 10^18 units)
+    AMOUNT=$(echo "$AMOUNT_IP * 10^18" | bc)
+    AMOUNT=${AMOUNT%%.*}
+
+    # Key management: Check local key or ask user
+    PRIVATE_KEY=$(grep -oP '(?<=PRIVATE_KEY=).*' $HOME/.story/story/config/private_key.txt 2>/dev/null)
+    
+    if [ -z "$PRIVATE_KEY" ]; then
+        echo -e "${YELLOW}Private key not found automatically.${RESET}"
+        read -s -p "Enter your private key (hidden input): " PRIVATE_KEY
+        echo ""
+    fi
+
+    if [ -z "$PRIVATE_KEY" ]; then
+        echo -e "${RED}Error: Private key is required to proceed.${RESET}"
+        menu
+        return
+    fi
+    # Create .env file
+    echo "PRIVATE_KEY=$PRIVATE_KEY" > $HOME/.env
+
+    if [ "$RPC_CHOICE" == "2" ]; then
+        story validator redelegate --validator-src-pubkey $SRC_VALIDATOR_PUBKEY --validator-dst-pubkey $DST_VALIDATOR_PUBKEY --redelegate $AMOUNT --rpc https://lightnode-json-rpc-story.grandvalleys.com:443 --chain-id "$STORY_CHAIN_ID"
+    elif [ "$RPC_CHOICE" == "1" ]; then
+        story validator redelegate --validator-src-pubkey $SRC_VALIDATOR_PUBKEY --validator-dst-pubkey $DST_VALIDATOR_PUBKEY --redelegate $AMOUNT --chain-id "$STORY_CHAIN_ID"
+    else
+        echo "Invalid choice. Please select a valid option."
+        redelegate_tokens
+    fi
+
+    # Cleanup .env
+    rm -f $HOME/.env
+
+    menu
+}
+
 function export_evm_key() {
     echo -e "${CYAN}Query all of your current EVM key addresses including your EVM private key${RESET}"
     
@@ -854,6 +957,7 @@ function menu() {
     echo "   d. Stake Tokens"
     echo "   e. Unstake Tokens"
     echo "   f. Export EVM Key"
+    echo "   g. Redelegate Tokens"
     echo -e "${GREEN}3. Node Management:${RESET}"
     echo "   a. Restart Validator Node"
     echo "   b. Restart Consensus Client Only"
@@ -910,6 +1014,7 @@ function menu() {
                 d) stake_tokens ;;
                 e) unstake_tokens ;;
                 f) export_evm_key ;;
+                g) redelegate_tokens ;;
                 *) echo "Invalid sub-option. Please try again." ;;
             esac
             ;;
