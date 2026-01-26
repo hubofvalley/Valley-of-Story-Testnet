@@ -473,30 +473,43 @@ function unstake_tokens() {
     AMOUNT=$(echo "$AMOUNT_IP * 10^18" | bc)
     AMOUNT=${AMOUNT%%.*}
 
-    # Key management: Check local key or ask user
-    PRIVATE_KEY=$(grep -oP '(?<=PRIVATE_KEY=).*' $HOME/.story/story/config/private_key.txt 2>/dev/null)
-    
-    if [ -z "$PRIVATE_KEY" ]; then
-        echo -e "${YELLOW}Private key not found automatically.${RESET}"
-        read -s -p "Enter your private key (hidden input): " PRIVATE_KEY
-        echo ""
+    # Encrypted KEY workflow
+    ENC_KEY_FILE="$HOME/.story/story/config/priv_validator_key.enc"
+    if [ ! -f "$ENC_KEY_FILE" ]; then
+        echo -e "${YELLOW}No encrypted private key found.${RESET}"
+        read -p "Do you want to encrypt your key now? (yes/no): " ENCRYPT_CHOICE
+        if [[ "${ENCRYPT_CHOICE,,}" == "yes" ]]; then
+             # Read existing private key
+            PRIVATE_KEY=$(grep -oP '(?<=PRIVATE_KEY=).*' $HOME/.story/story/config/private_key.txt 2>/dev/null)
+            if [ -z "$PRIVATE_KEY" ]; then
+                read -p "Enter your private key: " PRIVATE_KEY
+            fi
+            
+            if [ -z "$PRIVATE_KEY" ]; then
+                echo -e "${RED}Error: No private key found or provided.${RESET}"
+                menu
+                return
+            fi
+            
+            # Create temporary .env file
+            echo "PRIVATE_KEY=$PRIVATE_KEY" > $HOME/.env
+            
+            story key encrypt --enc-key-file "$ENC_KEY_FILE" --chain-id "$STORY_CHAIN_ID"
+            rm -f $HOME/.env
+        else
+            echo -e "${RED}Operation cancelled. Encrypted key required.${RESET}"
+            menu
+            return
+        fi
     fi
-
-    if [ -z "$PRIVATE_KEY" ]; then
-        echo -e "${RED}Error: Private key is required to proceed.${RESET}"
-        menu
-        return
-    fi
-    # Create .env file
-    echo "PRIVATE_KEY=$PRIVATE_KEY" > $HOME/.env
 
     if [ "$RPC_CHOICE" == "2" ]; then
-        story validator unstake --validator-pubkey $VALIDATOR_PUBKEY --unstake $AMOUNT --rpc https://lightnode-json-rpc-story.grandvalleys.com:443 --chain-id "$STORY_CHAIN_ID"
+        story validator unstake --validator-pubkey $VALIDATOR_PUBKEY --unstake $AMOUNT --enc-key-file "$ENC_KEY_FILE" --rpc https://lightnode-json-rpc-story.grandvalleys.com:443 --chain-id "$STORY_CHAIN_ID"
     elif [ "$RPC_CHOICE" == "1" ]; then
-        story validator unstake --validator-pubkey $VALIDATOR_PUBKEY --unstake $AMOUNT --chain-id "$STORY_CHAIN_ID"
+        story validator unstake --validator-pubkey $VALIDATOR_PUBKEY --unstake $AMOUNT --enc-key-file "$ENC_KEY_FILE" --chain-id "$STORY_CHAIN_ID"
     else
         echo "Invalid choice. Please select a valid option."
-        unstake_tokens
+        redelegate_tokens
     fi
 
     # Cleanup .env
@@ -854,6 +867,7 @@ function menu() {
     echo "   d. Stake Tokens"
     echo "   e. Unstake Tokens"
     echo "   f. Export EVM Key"
+    echo "   g. Redelegate Tokens"
     echo -e "${GREEN}3. Node Management:${RESET}"
     echo "   a. Restart Validator Node"
     echo "   b. Restart Consensus Client Only"
@@ -910,6 +924,7 @@ function menu() {
                 d) stake_tokens ;;
                 e) unstake_tokens ;;
                 f) export_evm_key ;;
+                g) redelegate_tokens ;;
                 *) echo "Invalid sub-option. Please try again." ;;
             esac
             ;;
