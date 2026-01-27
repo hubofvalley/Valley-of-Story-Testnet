@@ -59,7 +59,7 @@ ${YELLOW}| Category  | Requirements     |
 - consensus client service file name: ${CYAN}${STORY_SERVICE_NAME}.service${RESET}
 - geth service file name: ${CYAN}${STORY_GETH_SERVICE_NAME}.service${RESET}
 - current chain: ${CYAN}aeneid${RESET}
-- current story node version: ${CYAN}v1.5.1${RESET}
+- current story node version: ${CYAN}v1.5.2${RESET}
 - current story-geth node version: ${CYAN}v1.2.0${RESET}
 "
 
