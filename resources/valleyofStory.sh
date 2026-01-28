@@ -784,9 +784,9 @@ function show_geth_logs() {
 
 function install_story_app() {
     echo -e "${YELLOW}This option is only for those who want to execute the transactions without running the node.${RESET}"
-    mkdir -p story-v1.4.2
-    wget -O story-v1.4.2/story https://github.com/piplabs/story/releases/download/v1.4.2/story-linux-amd64
-    cp story-v1.4.2/story $HOME/go/bin/story
+    mkdir -p story-v1.5.2
+    wget -O story-v1.5.2/story https://github.com/piplabs/story/releases/download/v1.5.2/story-linux-amd64
+    cp story-v1.5.2/story $HOME/go/bin/story
     sudo chown -R $USER:$USER $HOME/go/bin/story
     sudo chmod +x $HOME/go/bin/story
     story init --network $STORY_NETWORK_NAME --moniker gv-story --encrypt-priv-key
