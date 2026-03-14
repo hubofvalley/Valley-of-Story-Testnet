@@ -68,8 +68,7 @@ update_version() {
 # Menu for selecting the version
 echo "Choose the version to update to:"
 echo "a. v1.1.0 (Cosmas)"
-echo "b. v1.2.0 (Yasunari)"
-echo "c. v1.2.1"
+echo "b. v1.2.1 (Yasunari)"
 
 read -p "Enter the letter corresponding to the version: " choice
 
@@ -78,9 +77,6 @@ case $choice in
         update_version "v1.1.0" "https://github.com/piplabs/story-geth/releases/download/v1.1.0"
         ;;
     b)
-        update_version "v1.2.0" "https://github.com/piplabs/story-geth/releases/download/v1.2.0"
-        ;;
-    c)
         update_version "v1.2.1" "https://github.com/piplabs/story-geth/releases/download/v1.2.1"
         ;;
     *)
