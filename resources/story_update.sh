@@ -237,6 +237,7 @@ echo -e "e. ${YELLOW}v1.3.3${RESET} (${RESET}Upgrade height: 10,032,301)"
 echo -e "f. ${YELLOW}v1.4.0${RESET} (${GREEN}Terence${RESET} Upgrade height: 10,886,680)"
 echo -e "g. ${YELLOW}v1.4.2${RESET} (${GREEN}v1.4 critical security issue fix${RESET} Upgrade height: $(LC_NUMERIC='en_US.UTF-8' printf "%'d" $((realtime_block_height + 100))))"
 echo -e "h. ${YELLOW}v1.5.2${RESET} (${GREEN}Horace - Mandatory Hardfork${RESET} Upgrade height: $(LC_NUMERIC='en_US.UTF-8' printf "%'d" $((realtime_block_height + 100))))"
+echo -e "i. ${YELLOW}v1.6.1${RESET} (${GREEN}${RESET} Upgrade height: 16,332,000)"
 #echo "f. Batch update: Upgrade to v1.1.0 at height 640,000, v1.4.2 at height 858,000, v1.4.2 at height 3,861,111 and v1.3.0 at height 5,707,000 (RECOMMENDED FOR THOSE AIMING TO ACHIEVE ARCHIVE NODE STATUS)."
 read -p "Enter the letter corresponding to the version: " choice
 
@@ -264,6 +265,9 @@ case $choice in
         ;;
     h)
         update_version "v1.5.2" "https://github.com/piplabs/story/releases/download/v1.5.2" $((realtime_block_height + 100))
+        ;;
+    i)
+        update_version "v1.6.1" "https://github.com/piplabs/story/releases/download/v1.6.1" 16332000
         ;;
     #f)
         #batch_update_version
