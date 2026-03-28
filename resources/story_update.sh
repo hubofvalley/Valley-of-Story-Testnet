@@ -177,6 +177,41 @@ update_version() {
     fi
 }
 
+# Function to update to a version where halt height is determined on-chain (no --upgrade-height flag)
+update_version_no_height() {
+    local version=$1
+    local download_url=$2
+    local upgrade_name=$3
+
+    # Create directory and download the binary
+    cd $HOME
+    mkdir -p $HOME/story-$version
+    if ! wget -P $HOME/story-$version $download_url/$story_file_name -O $HOME/story-$version/story; then
+        echo "Failed to download the binary. Exiting."
+        exit 1
+    fi
+
+    # Set ownership and permissions
+    sudo chown -R $USER:$USER $HOME/.story && \
+    sudo chown -R $USER:$USER $HOME/go/bin/story && \
+    sudo chmod +x $HOME/story-$version/story && \
+    sudo chmod +x $HOME/go/bin/story && \
+    sudo rm -f $HOME/.story/story/data/upgrade-info.json && \
+    sudo rm -r $HOME/.story/story/cosmovisor/upgrades/$upgrade_name
+
+    # Copy the updated binary to the cosmovisor genesis directory
+    GENESIS_DIR="$HOME/.story/story/cosmovisor/genesis/bin"
+    cp "$HOME/story-$version/story" "$GENESIS_DIR/story"
+    sudo chown -R $USER:$USER "$GENESIS_DIR/story"
+    sudo chmod +x "$GENESIS_DIR/story"
+
+    # Add the upgrade to cosmovisor (no --upgrade-height, halt height is on-chain)
+    if ! cosmovisor add-upgrade $upgrade_name $HOME/story-$version/story; then
+        echo "Failed to add upgrade to cosmovisor. Exiting."
+        exit 1
+    fi
+}
+
 # Function to perform batch update
 batch_update_version() {
     local version1="v1.1.0"
@@ -237,7 +272,7 @@ echo -e "e. ${YELLOW}v1.3.3${RESET} (${RESET}Upgrade height: 10,032,301)"
 echo -e "f. ${YELLOW}v1.4.0${RESET} (${GREEN}Terence${RESET} Upgrade height: 10,886,680)"
 echo -e "g. ${YELLOW}v1.4.2${RESET} (${GREEN}v1.4 critical security issue fix${RESET} Upgrade height: $(LC_NUMERIC='en_US.UTF-8' printf "%'d" $((realtime_block_height + 100))))"
 echo -e "h. ${YELLOW}v1.5.2${RESET} (${GREEN}Horace - Mandatory Hardfork${RESET} Upgrade height: $(LC_NUMERIC='en_US.UTF-8' printf "%'d" $((realtime_block_height + 100))))"
-echo -e "i. ${YELLOW}v1.6.1${RESET} (${GREEN}${RESET} Upgrade height: 16,332,000)"
+echo -e "i. ${YELLOW}v1.6.1${RESET} (${GREEN}DKG + Confidential Data Rails${RESET} Upgrade height: 16,332,000)"
 #echo "f. Batch update: Upgrade to v1.1.0 at height 640,000, v1.4.2 at height 858,000, v1.4.2 at height 3,861,111 and v1.3.0 at height 5,707,000 (RECOMMENDED FOR THOSE AIMING TO ACHIEVE ARCHIVE NODE STATUS)."
 read -p "Enter the letter corresponding to the version: " choice
 
@@ -267,7 +302,7 @@ case $choice in
         update_version "v1.5.2" "https://github.com/piplabs/story/releases/download/v1.5.2" $((realtime_block_height + 100))
         ;;
     i)
-        update_version "v1.6.1" "https://github.com/piplabs/story/releases/download/v1.6.1" 16332000
+        update_version_no_height "v1.6.1" "https://github.com/piplabs/story/releases/download/v1.6.1" "v1.6.1"
         ;;
     #f)
         #batch_update_version
