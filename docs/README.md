@@ -28,8 +28,8 @@ This folder contains detailed documentation for the Valley of Story Testnet tool
 
 | Component | Version |
 |-----------|---------|
-| Story (consensus) | v1.4.2 |
-| Story-Geth (execution) | v1.2.0 |
+| Story (consensus) | v1.5.2 |
+| Story-Geth (execution) | v1.2.1 |
 | Chain | aeneid |
 | Chain ID | 1315 |
 

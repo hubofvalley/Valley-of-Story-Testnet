@@ -34,8 +34,8 @@ A validator node participates in Story Protocol's consensus mechanism by validat
 
 | Component | Details |
 |-----------|---------|
-| **story** | Consensus client (v1.4.2) |
-| **story-geth** | Execution client (v1.2.0) |
+| **story** | Consensus client (v1.5.2) |
+| **story-geth** | Execution client (v1.2.1) |
 | **story.service** | Systemd service for consensus |
 | **story-geth.service** | Systemd service for execution |
 | **Data directory** | `$HOME/.story` |
@@ -232,7 +232,7 @@ If you only need to execute transactions without running a full node:
 1. Launch Valley of Story
 2. Select **"Install the Story App only"**
 
-This installs the `story` binary (v1.4.2) for signing transactions.
+This installs the `story` binary (v1.5.2) for signing transactions.
 
 ## Related Documentation
 
