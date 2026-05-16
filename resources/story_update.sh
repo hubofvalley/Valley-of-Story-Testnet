@@ -273,6 +273,7 @@ echo -e "f. ${YELLOW}v1.4.0${RESET} (${GREEN}Terence${RESET} Upgrade height: 10,
 echo -e "g. ${YELLOW}v1.4.2${RESET} (${GREEN}v1.4 critical security issue fix${RESET} Upgrade height: $(LC_NUMERIC='en_US.UTF-8' printf "%'d" $((realtime_block_height + 100))))"
 echo -e "h. ${YELLOW}v1.5.2${RESET} (${GREEN}Horace - Mandatory Hardfork${RESET} Upgrade height: $(LC_NUMERIC='en_US.UTF-8' printf "%'d" $((realtime_block_height + 100))))"
 echo -e "i. ${YELLOW}v1.6.0${RESET} (${GREEN}DKG + Confidential Data Rails${RESET} Upgrade height: 16,332,000 (but no --upgrade-height flag is being used))"
+echo -e "j. ${YELLOW}v1.7.0${RESET} (${GREEN}Seneca${RESET} Upgrade height: $(LC_NUMERIC='en_US.UTF-8' printf "%'d" $((realtime_block_height + 100))))"
 #echo "f. Batch update: Upgrade to v1.1.0 at height 640,000, v1.4.2 at height 858,000, v1.4.2 at height 3,861,111 and v1.3.0 at height 5,707,000 (RECOMMENDED FOR THOSE AIMING TO ACHIEVE ARCHIVE NODE STATUS)."
 read -p "Enter the letter corresponding to the version: " choice
 
@@ -303,6 +304,9 @@ case $choice in
         ;;
     i)
         update_version_no_height "v1.6.0" "https://github.com/piplabs/story/releases/download/v1.6.1" "v1.6.0"
+        ;;
+    j)
+        update_version_no_height "v1.7.0" "https://github.com/piplabs/story/releases/download/v1.7.0" "v1.7.0"
         ;;
     #f)
         #batch_update_version
