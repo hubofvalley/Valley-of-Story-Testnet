@@ -306,7 +306,7 @@ case $choice in
         update_version_no_height "v1.6.0" "https://github.com/piplabs/story/releases/download/v1.6.1" "v1.6.0"
         ;;
     j)
-        update_version_no_height "v1.7.0" "https://github.com/piplabs/story/releases/download/v1.7.0" "v1.7.0"
+        update_version_no_height "v1.7.0" "https://github.com/piplabs/story/releases/download/v1.7.0" "v1.7.0" $((realtime_block_height + 100))
         ;;
     #f)
         #batch_update_version
