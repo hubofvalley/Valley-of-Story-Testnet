@@ -911,7 +911,14 @@ function show_guidelines() {
 
 # Menu function
 function menu() {
-    realtime_block_height=$(curl -s -X POST "https://aeneid.storyrpc.io" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' | jq -r '.result' | xargs printf "%d\n")
+    realtime_block_height=$(curl -s -X POST "https://aeneid.storyrpc.io" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' | jq -r '.result' | xargs printf "%d\n" 2>/dev/null)
+    [ -z "$realtime_block_height" ] && realtime_block_height="N/A"
+    local_node_height=$(story status 2>/dev/null | jq -r '.sync_info.latest_block_height // empty' 2>/dev/null)
+    [ -z "$local_node_height" ] && local_node_height="N/A (node not running)"
+    block_difference="N/A"
+    if [[ "$realtime_block_height" =~ ^[0-9]+$ && "$local_node_height" =~ ^[0-9]+$ ]]; then
+        block_difference=$(( realtime_block_height - local_node_height ))
+    fi
     echo -e "${ORANGE}Valley of Story Testnet${RESET}"
     echo -e "${CYAN}Story Validator Node = Consensus Client Service + Execution Client Service (geth/story-geth)${RESET}"
     echo "Main Menu:"
@@ -950,7 +957,9 @@ function menu() {
     echo -e "${YELLOW}6. Show Guidelines${RESET}"
     echo -e "${RED}7. Exit${RESET}"
 
-    echo -e "Latest Block Height: ${GREEN}$realtime_block_height${RESET}"
+    echo -e "Network Latest Block Height: ${GREEN}$realtime_block_height${RESET}"
+    echo -e "Local Node Block Height: ${GREEN}$local_node_height${RESET}"
+    echo -e "Block Difference: ${YELLOW}$block_difference${RESET}"
     echo -e "\n${YELLOW}Please run the following command to apply the changes after exiting the script:${RESET}"
     echo -e "${GREEN}source ~/.bash_profile${RESET}"
     echo -e "${YELLOW}This ensures the environment variables are set in your current bash session.${RESET}"
