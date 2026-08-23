@@ -5,7 +5,7 @@
 <h1 align="center">Valley of Story Testnet</h1>
 
 <p align="center">
-  <strong>A comprehensive toolkit for deploying and managing Story Protocol validator nodes on testnet (Aeneid)</strong>
+  <strong>Toolkit for deploying and managing Story Protocol validator nodes on testnet (Aeneid)</strong>
 </p>
 
 <p align="center">
@@ -16,11 +16,11 @@
 
 ---
 
-## 🚀 Overview
+## Overview
 
 Valley of Story Testnet is an open-source project by **Grand Valley** that provides automated scripts for deploying and managing Story Protocol validator nodes on the **Aeneid testnet**.
 
-## 📋 System Requirements
+## System Requirements
 
 | Category | Requirements |
 |----------|--------------|
@@ -29,7 +29,7 @@ Valley of Story Testnet is an open-source project by **Grand Valley** that provi
 | Storage | 500+ GB NVMe SSD |
 | Bandwidth | 100+ MBit/s |
 
-## ⚡ Quick Start
+## Getting started
 
 Run the main interactive menu:
 
@@ -37,7 +37,7 @@ Run the main interactive menu:
 bash <(curl -s https://raw.githubusercontent.com/hubofvalley/Testnet-Guides/main/Story%20Protocol/resources/valleyofStory.sh)
 ```
 
-## 📦 Features
+## Features
 
 The Valley of Story menu provides:
 
@@ -62,7 +62,7 @@ The Valley of Story menu provides:
 - Schedule stop/restart operations
 - Delete validator node
 
-## 🔧 Current Versions
+## Current Versions
 
 | Component | Version |
 |-----------|---------|
@@ -71,7 +71,7 @@ The Valley of Story menu provides:
 | Chain | aeneid |
 | Chain ID | 1315 |
 
-## 🌐 Grand Valley Public Endpoints
+## Grand Valley Public Endpoints
 
 | Type | URL |
 |------|-----|
@@ -82,18 +82,18 @@ The Valley of Story menu provides:
 | EVM WebSocket | `wss://lightnode-wss-story.grandvalleys.com` |
 | Peer | `7e311e22cff1a0d39c3758e342fa4c2ee1aea461@peer-story.grandvalleys.com:28656` |
 
-## 🔐 Privacy & Security
+## Privacy & Security
 
 - **No external data storage** - All operations run locally
 - **No phishing links** - All URLs are for legitimate Story operations
 - **Open source** - Full audit trail available
 - Please verify script integrity before running
 
-## 📖 Documentation
+## Documentation
 
 For detailed documentation, see the [docs/](docs/) folder.
 
-## 🔗 Links
+## Links
 
 **Story Protocol:**
 - [Website](https://www.story.foundation) | [Docs](https://docs.story.foundation) | [X/Twitter](https://x.com/StoryProtocol)
@@ -105,10 +105,10 @@ For detailed documentation, see the [docs/](docs/) folder.
 - [Aeneid Staking](https://aeneid.staking.story.foundation/validators/0x1b5452a212db06F6D6879C292157396B6dCa44d7)
 - [Aeneid StoryScan](https://aeneid.storyscan.app/validators/storyvaloper1rd299gsjmvr0d458ns5jz4eeddku53xhm5j2j4)
 
-## 📧 Contact
+## Contact
 
 Email: letsbuidltogether@grandvalleys.com
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
