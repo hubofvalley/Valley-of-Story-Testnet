@@ -61,7 +61,7 @@ After your node is fully synced:
 4. Configure:
    - **Moniker**: Your validator name
    - **Stake amount**: Minimum 1024 IP
-   - **Stake type**: 
+   - **Stake type**:
      - Locked (non-withdrawable)
      - Unlocked (withdrawable)
    - **Commission rate**: e.g., 10 for 10%
@@ -200,7 +200,7 @@ This copies `priv_validator_key.json` to your `$HOME` directory.
 
 ## Deleting the Node
 
-> ⚠️ **WARNING**: Backup your seeds phrase, EVM private key, and `priv_validator_key.json` before deleting!
+>  **WARNING**: Backup your seeds phrase, EVM private key, and `priv_validator_key.json` before deleting!
 
 1. Launch Valley of Story
 2. Select **"Node Management"** → **"Delete Validator Node"**
