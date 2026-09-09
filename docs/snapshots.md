@@ -17,20 +17,20 @@ Snapshots allow you to quickly sync your node by downloading a pre-synced databa
 
 1. Launch Valley of Story:
    ```bash
-   bash <(curl -s https://raw.githubusercontent.com/hubofvalley/Testnet-Guides/main/Story%20Protocol/resources/valleyofStory.sh)
+   bash <(curl -fsSL https://raw.githubusercontent.com/hubofvalley/Valley-of-Story-Testnet/main/resources/valleyofStory.sh)
    ```
 2. Select **"Node Interactions"** → **"Apply Snapshot"**
 3. Choose your preferred snapshot provider
-4. Follow the prompts
+4. Follow the prompts and type `APPLY-STORY-SNAPSHOT` only after the archives have downloaded and passed LZ4/archive validation
 
 ## What the Snapshot Script Does
 
-1. **Stops services** - Stops story and story-geth
-2. **Backs up important files** - Saves validator keys
-3. **Downloads snapshot** - From selected provider
-4. **Extracts data** - Replaces chain data
-5. **Restores keys** - Puts validator keys back
-6. **Restarts services** - Brings node back online
+1. **Downloads and stages archives first** - Provider failures do not remove live chain data
+2. **Stops services after confirmation** - Stops story and story-geth only after validation
+3. **Backs up node data** - Retains a timestamped pre-snapshot backup and preserves validator state
+4. **Extracts data** - Replaces consensus and execution data only
+5. **Restores validator state** - Keeps the local signer state instead of importing provider state
+6. **Restarts conditionally** - Restarts services only when they were active before the operation
 
 ## Available Snapshot Providers
 
@@ -44,7 +44,7 @@ The script presents multiple snapshot providers to choose from. Each provider ma
 
 ### Backup Important Files
 
-The snapshot script handles backups automatically, but important files include:
+The snapshot script handles node-data backups automatically, but important files include:
 
 | File | Location | Purpose |
 |------|----------|---------|
@@ -85,11 +85,13 @@ You can also backup manually via:
 ### Node Not Starting After Snapshot
 1. Check logs via **"Show Consensus Client Logs"**
 2. Verify data directories exist
-3. Check if validator keys were restored
+3. Restore the retained pre-snapshot backup shown by the helper
+4. Check that validator state and validator keys are present
 
 ### Wrong Chain Data
 - Ensure you're using an Aeneid testnet snapshot
 - Verify chain ID matches: `aeneid` (chain ID: 1315)
+- Snapshot application does not select or schedule an obsolete consensus binary; review current Story release guidance separately
 
 ### Catching Up Is Slow
 - This is normal initially after snapshot apply

@@ -28,19 +28,14 @@ This folder contains detailed documentation for the Valley of Story Testnet tool
 
 | Component | Version |
 |-----------|---------|
-| Story (consensus) | v1.5.2 |
+| Story (consensus) | v1.7.0 |
 | Story-Geth (execution) | v1.2.1 |
 | Chain | aeneid |
 | Chain ID | 1315 |
 
-## Grand Valley Endpoints
+## Grand Valley endpoint status
 
-| Type | URL |
-|------|-----|
-| Cosmos RPC | `https://lightnode-rpc-story.grandvalleys.com` |
-| EVM RPC | `https://lightnode-json-rpc-story.grandvalleys.com` |
-| Cosmos REST API | `https://lightnode-api-story.grandvalleys.com` |
-| Peer | `7e311e22cff1a0d39c3758e342fa4c2ee1aea461@peer-story.grandvalleys.com:28656` |
+Grand Valley endpoint entries are not guaranteed to be live. Verify current endpoint availability and network identity before use; this toolkit does not claim active-validator-set membership or continuous public service availability.
 
 ## Support
 

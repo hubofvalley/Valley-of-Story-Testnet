@@ -34,7 +34,7 @@ Valley of Story Testnet is an open-source project by **Grand Valley** that provi
 Run the main interactive menu:
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/hubofvalley/Testnet-Guides/main/Story%20Protocol/resources/valleyofStory.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/hubofvalley/Valley-of-Story-Testnet/main/resources/valleyofStory.sh)
 ```
 
 ## Features
@@ -66,25 +66,18 @@ The Valley of Story menu provides:
 
 | Component | Version |
 |-----------|---------|
-| Story (consensus) | v1.5.2 |
+| Story (consensus) | v1.7.0 |
 | Story-Geth (execution) | v1.2.1 |
 | Chain | aeneid |
 | Chain ID | 1315 |
 
-## Grand Valley Public Endpoints
+## Grand Valley endpoint status
 
-| Type | URL |
-|------|-----|
-| Cosmos RPC | `https://lightnode-rpc-story.grandvalleys.com` |
-| EVM RPC | `https://lightnode-json-rpc-story.grandvalleys.com` |
-| Cosmos REST API | `https://lightnode-api-story.grandvalleys.com` |
-| Cosmos WebSocket | `wss://lightnode-rpc-story.grandvalleys.com/websocket` |
-| EVM WebSocket | `wss://lightnode-wss-story.grandvalleys.com` |
-| Peer | `7e311e22cff1a0d39c3758e342fa4c2ee1aea461@peer-story.grandvalleys.com:28656` |
+Grand Valley endpoint entries are not guaranteed to be live. Verify current endpoint availability and network identity before use; the toolkit does not claim active-validator-set membership or continuous public service availability.
 
 ## Privacy & Security
 
-- **No external data storage** - All operations run locally
+- **Local key/data boundary** - Keys and node data remain on your machine; network requests go only to the endpoint or release sources selected by the workflow
 - **No phishing links** - All URLs are for legitimate Story operations
 - **Open source** - Full audit trail available
 - Please verify script integrity before running
@@ -99,7 +92,7 @@ For detailed documentation, see the [docs/](docs/) folder.
 - [Website](https://www.story.foundation) | [Docs](https://docs.story.foundation) | [X/Twitter](https://x.com/StoryProtocol)
 
 **Grand Valley:**
-- [GitHub](https://github.com/hubofvalley) | [X/Twitter](https://x.com/bacvalley) | [Testnet Guide](https://github.com/hubofvalley/Testnet-Guides/tree/main/Story%20Protocol)
+- [GitHub](https://github.com/hubofvalley) | [X/Twitter](https://x.com/bacvalley) | [Testnet toolkit](https://github.com/hubofvalley/Valley-of-Story-Testnet)
 
 **Validators & Explorers:**
 - [Aeneid Staking](https://aeneid.staking.story.foundation/validators/0x1b5452a212db06F6D6879C292157396B6dCa44d7)

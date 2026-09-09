@@ -3,6 +3,8 @@
 set -e
 
 # ==== CONFIG ====
+is_valid_service_name() { [[ "$1" =~ ^[A-Za-z0-9_.@-]+$ ]]; }
+is_valid_moniker() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_.[:space:]-]{0,63}$ ]]; }
 echo -e "\n--- Story Testnet Validator Node Setup ---"
 
 LOGO="
@@ -15,10 +17,16 @@ LOGO="
 echo "$LOGO"
 
 # Prompt for MONIKER, STORY_PORT, and Indexer option
-read -p "Enter your moniker: " MONIKER
-read -p "Enter your preferred port number: (leave empty to use default: 26)" STORY_PORT
-if [ -z "$STORY_PORT" ]; then
-    STORY_PORT=26
+read -r -p "Enter your moniker: " MONIKER
+if ! is_valid_moniker "$MONIKER"; then
+    echo "Invalid moniker. Use 1-64 letters, numbers, spaces, '.', '_' or '-'." >&2
+    exit 1
+fi
+read -r -p "Enter your preferred port number: (leave empty to use default: 26)" STORY_PORT
+STORY_PORT=${STORY_PORT:-26}
+if ! [[ "$STORY_PORT" =~ ^[0-9]{2}$ ]] || ((STORY_PORT < 10 || STORY_PORT > 64)); then
+    echo "Invalid port prefix. Use a two-digit value from 10 to 64." >&2
+    exit 1
 fi
 read -p "Do you want to enable the indexer? (yes/no): " ENABLE_INDEXER
 read -p "Configure UFW firewall rules for Story? (y/n): " SETUP_UFW
@@ -34,19 +42,37 @@ if [ -z "$STORY_GETH_SERVICE_NAME" ]; then
     STORY_GETH_SERVICE_NAME=${STORY_GETH_SERVICE_NAME:-story-geth}
 fi
 
+if ! is_valid_service_name "$STORY_SERVICE_NAME" || ! is_valid_service_name "$STORY_GETH_SERVICE_NAME"; then
+    echo "Invalid service name. Use letters, numbers, '.', '_', '@', or '-' only." >&2
+    exit 1
+fi
 echo "Using Service Names: ${STORY_SERVICE_NAME} and ${STORY_GETH_SERVICE_NAME}"
 
-# Stop and remove existing Story node (uses custom service names)
+# Validate host and peer inputs before any destructive redeploy action.
+source /etc/os-release
+if [ "${ID:-}" != ubuntu ] || ! dpkg --compare-versions "${VERSION_ID:-0}" ge "22.04"; then
+    echo "Unsupported host. This installer requires Ubuntu 22.04 or newer." >&2
+    exit 1
+fi
+if [ -z "${STORY_PERSISTENT_PEERS:-}" ]; then
+    read -r -p "Enter verified persistent peers (leave empty to configure later): " STORY_PERSISTENT_PEERS
+fi
+if [ -n "${STORY_PERSISTENT_PEERS:-}" ] && ! [[ "$STORY_PERSISTENT_PEERS" =~ ^[A-Za-z0-9@.,:_-]+$ ]]; then
+    echo "Invalid STORY_PERSISTENT_PEERS value." >&2
+    exit 1
+fi
+
+# Stop and remove existing Story node (uses validated custom service names)
 sudo systemctl daemon-reload
-sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}  2>/dev/null || true
-sudo systemctl disable ${STORY_SERVICE_NAME}  2>/dev/null || true
-sudo systemctl disable ${STORY_GETH_SERVICE_NAME}  2>/dev/null || true
-sudo rm -rf /etc/systemd/system/${STORY_SERVICE_NAME}.service  2>/dev/null || true
-sudo rm -rf /etc/systemd/system/${STORY_GETH_SERVICE_NAME}.service  2>/dev/null || true
-sudo rm -r $HOME/go/bin/story  2>/dev/null || true
-sudo rm -r $HOME/go/bin/story-geth $HOME/go/bin/geth  2>/dev/null || true
-sudo rm -rf $HOME/.story  2>/dev/null || true
-sed -i "/STORY_/d" $HOME/.bash_profile  2>/dev/null || true
+sudo systemctl stop "$STORY_SERVICE_NAME" "$STORY_GETH_SERVICE_NAME" 2>/dev/null || true
+sudo systemctl disable "$STORY_SERVICE_NAME" 2>/dev/null || true
+sudo systemctl disable "$STORY_GETH_SERVICE_NAME" 2>/dev/null || true
+sudo rm -rf "/etc/systemd/system/${STORY_SERVICE_NAME}.service" 2>/dev/null || true
+sudo rm -rf "/etc/systemd/system/${STORY_GETH_SERVICE_NAME}.service" 2>/dev/null || true
+sudo rm -r "$HOME/go/bin/story" 2>/dev/null || true
+sudo rm -r "$HOME/go/bin/story-geth" "$HOME/go/bin/geth" 2>/dev/null || true
+sudo rm -rf "$HOME/.story" 2>/dev/null || true
+sed -i "/STORY_/d" "$HOME/.bash_profile" 2>/dev/null || true
 
 # 1. Install dependencies for building from source
 sudo apt update -y && sudo apt upgrade -y
@@ -68,9 +94,9 @@ go install cosmossdk.io/tools/cosmovisor/cmd/cosmovisor@latest
 export MONIKER=$MONIKER
 export STORY_CHAIN_ID="aeneid"
 export STORY_PORT=$STORY_PORT
-echo "export MONIKER=\"$MONIKER\"" >> $HOME/.bash_profile
-echo "export STORY_CHAIN_ID=\"aeneid\"" >> $HOME/.bash_profile
-echo "export STORY_PORT=\"$STORY_PORT\"" >> $HOME/.bash_profile
+printf 'export MONIKER=%q\n' "$MONIKER" >> "$HOME/.bash_profile"
+echo 'export STORY_CHAIN_ID="aeneid"' >> "$HOME/.bash_profile"
+printf 'export STORY_PORT=%q\n' "$STORY_PORT" >> "$HOME/.bash_profile"
 source $HOME/.bash_profile
 
 # Optional: Configure UFW based on chosen ports
@@ -124,7 +150,7 @@ sudo chown -R $USER:$USER $HOME/go/bin/story
 sudo chmod +x $HOME/go/bin/story
 
 # 6. Initialize the app
-story init --network $STORY_CHAIN_ID --moniker $MONIKER
+story init --network "$STORY_CHAIN_ID" --moniker "$MONIKER"
 
 # 7. Set custom ports in config.toml and story.toml
 sed -i.bak -e "s%laddr = \"tcp://0.0.0.0:26656\"%laddr = \"tcp://0.0.0.0:${STORY_PORT}656\"%;
@@ -135,10 +161,13 @@ s%laddr = \"tcp://127.0.0.1:26657\"%laddr = \"tcp://127.0.0.1:${STORY_PORT}657\"
 sed -i.bak -e "s%engine-endpoint = \"http://localhost:8551\"%engine-endpoint = \"http://localhost:${STORY_PORT}551\"%;
 s%address = \"127.0.0.1:1317\"%address = \"127.0.0.1:${STORY_PORT}317\"%" $HOME/.story/story/config/story.toml
 
-# 8. Add peers to the config.toml
-peers=$(curl -sS https://lightnode-rpc-story.grandvalleys.com/net_info | jq -r '.result.peers[] | "\(.node_info.id)@\(.remote_ip):\(.node_info.listen_addr)"' | awk -F ':' '{print $1":"$(NF)}' | paste -sd, -)
-sed -i -e "s|^persistent_peers *=.*|persistent_peers = \"7e311e22cff1a0d39c3758e342fa4c2ee1aea461@peer-story.grandvalleys.com:28656,$peers\"|" $HOME/.story/story/config/config.toml
-echo $peers
+# 8. Add the preflight-validated peer list when supplied.
+if [ -n "${STORY_PERSISTENT_PEERS:-}" ]; then
+    sed -i -e "s|^persistent_peers *=.*|persistent_peers = \"$STORY_PERSISTENT_PEERS\"|" "$HOME/.story/story/config/config.toml"
+    echo "Configured persistent peers applied."
+else
+    echo "No peer list supplied; add verified persistent peers before starting the node."
+fi
 
 # 9. Enable or disable indexer based on user input
 if [ "$ENABLE_INDEXER" = "yes" ]; then
@@ -232,15 +261,15 @@ echo "export STORY_GETH_SERVICE_NAME=\"${STORY_GETH_SERVICE_NAME}\"" >> $HOME/.b
 
 # 13. Start the node
 sudo systemctl daemon-reload
-sudo systemctl enable ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
-sudo systemctl restart ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
+sudo systemctl enable "$STORY_GETH_SERVICE_NAME" "$STORY_SERVICE_NAME"
+sudo systemctl restart "$STORY_GETH_SERVICE_NAME" "$STORY_SERVICE_NAME"
 
 # 14. Confirmation message for installation completion
-if systemctl is-active --quiet ${STORY_SERVICE_NAME} && systemctl is-active --quiet ${STORY_GETH_SERVICE_NAME}; then
+if systemctl is-active --quiet "$STORY_SERVICE_NAME" && systemctl is-active --quiet "$STORY_GETH_SERVICE_NAME"; then
     echo "Node installation and services started successfully!"
 else
     echo "Node installation failed. Please check the logs for more information."
 fi
 
 # show the full logs
-echo "sudo journalctl -u ${STORY_GETH_SERVICE_NAME} -u ${STORY_SERVICE_NAME} -fn 100"
+echo "sudo journalctl -u \"${STORY_GETH_SERVICE_NAME}\" -u \"${STORY_SERVICE_NAME}\" -fn 100"
