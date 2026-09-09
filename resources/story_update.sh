@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # Colors
 RED='\033[0;31m'
@@ -12,6 +13,11 @@ RESET='\033[0m'
 source $HOME/.bash_profile 2>/dev/null
 STORY_SERVICE_NAME=${STORY_SERVICE_NAME:-story}
 STORY_GETH_SERVICE_NAME=${STORY_GETH_SERVICE_NAME:-story-geth}
+is_valid_service_name() { [[ "$1" =~ ^[A-Za-z0-9_.@-]+$ ]]; }
+is_valid_service_name "$STORY_SERVICE_NAME" && is_valid_service_name "$STORY_GETH_SERVICE_NAME" || {
+    echo "Invalid Story service name configuration. Refusing update." >&2
+    exit 1
+}
 
 # Function to install cosmovisor
 install_cosmovisor() {
@@ -26,15 +32,15 @@ install_cosmovisor() {
 init_cosmovisor() {
     echo "Initializing cosmovisor..."
 
-    # Download genesis story version
-    mkdir -p story-v1.4.2
-    if ! wget -p $HOME/story-v1.4.2 https://github.com/piplabs/story/releases/download/v1.4.2/story-linux-amd64 -O $HOME/story-v1.4.2/story; then
+    # Download the current Aeneid consensus version.
+    mkdir -p "$HOME/story-v1.7.0"
+    if ! wget -P "$HOME/story-v1.7.0" https://github.com/piplabs/story/releases/download/v1.7.0/story-linux-amd64 -O "$HOME/story-v1.7.0/story"; then
         echo "Failed to download the genesis binary. Exiting."
         exit 1
     fi
 
     # Initialize cosmovisor
-    if ! cosmovisor init $HOME/story-v1.4.2/story; then
+    if ! cosmovisor init "$HOME/story-v1.7.0/story"; then
         echo "Failed to initialize cosmovisor. Exiting."
         exit 1
     fi
@@ -51,15 +57,15 @@ init_cosmovisor() {
 
 # Function to initialize cosmovisor
 init_cosmovisor110() {
-    sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
+    sudo systemctl stop "$STORY_SERVICE_NAME" "$STORY_GETH_SERVICE_NAME"
 
     # Download genesis story version
-    mkdir -p story-v1.4.2
-    wget -p $HOME/story-v1.4.2 https://github.com/piplabs/story/releases/download/v1.4.2/story-linux-amd64 -O $HOME/story-v1.4.2/story
+    mkdir -p "$HOME/story-v1.7.0"
+    wget -P "$HOME/story-v1.7.0" https://github.com/piplabs/story/releases/download/v1.7.0/story-linux-amd64 -O "$HOME/story-v1.7.0/story"
 
     # Initialize cosmovisor
     sudo rm -r $HOME/.story/story/cosmovisor
-    cosmovisor init $HOME/story-v1.4.2/story
+    cosmovisor init "$HOME/story-v1.7.0/story"
     cd $HOME/go/bin/
     sudo rm -r story
     ln -s $HOME/.story/story/cosmovisor/current/bin/story story
@@ -68,7 +74,7 @@ init_cosmovisor110() {
     sudo rm -r $HOME/.story/story/data/upgrade-info.json
     mkdir -p $HOME/.story/story/cosmovisor/upgrades
     mkdir -p $HOME/.story/story/cosmovisor/backup
-    sudo systemctl restart ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
+    sudo systemctl restart "$STORY_SERVICE_NAME" "$STORY_GETH_SERVICE_NAME"
 }
 
 # Ask the user if cosmovisor is installed
@@ -112,7 +118,7 @@ echo "export DAEMON_DATA_BACKUP_DIR=$input3" >> $HOME/.bash_profile
 source $HOME/.bash_profile
 
 # Create or update the systemd service file
-sudo tee /etc/systemd/system/story.service > /dev/null <<EOF
+sudo tee "/etc/systemd/system/${STORY_SERVICE_NAME}.service" > /dev/null <<EOF
 [Unit]
 Description=Cosmovisor Story Node
 After=network.target
@@ -162,7 +168,7 @@ update_version() {
     sudo chmod +x $HOME/story-$version/story && \
     sudo chmod +x $HOME/go/bin/story && \
     sudo rm -f $HOME/.story/story/data/upgrade-info.json && \
-    sudo rm -r $HOME/.story/story/cosmovisor/upgrades/$version
+    sudo rm -rf "$HOME/.story/story/cosmovisor/upgrades/$version"
 
     # Copy the updated binary to the cosmovisor genesis directory
     GENESIS_DIR="$HOME/.story/story/cosmovisor/genesis/bin"
@@ -197,7 +203,7 @@ update_version_no_height() {
     sudo chmod +x $HOME/story-$version/story && \
     sudo chmod +x $HOME/go/bin/story && \
     sudo rm -f $HOME/.story/story/data/upgrade-info.json && \
-    sudo rm -r $HOME/.story/story/cosmovisor/upgrades/$upgrade_name
+    sudo rm -rf "$HOME/.story/story/cosmovisor/upgrades/$upgrade_name"
 
     # Copy the updated binary to the cosmovisor genesis directory
     GENESIS_DIR="$HOME/.story/story/cosmovisor/genesis/bin"
@@ -212,107 +218,28 @@ update_version_no_height() {
     fi
 }
 
-# Function to perform batch update
+# Historical batch upgrades are intentionally disabled in the active Aeneid flow.
 batch_update_version() {
-    local version1="v1.1.0"
-    local version2="v1.4.2"
-    local version3="v1.3.0"
-    local download_url1="https://github.com/piplabs/story/releases/download/v1.1.0"
-    local download_url2="https://github.com/piplabs/story/releases/download/v1.4.2"
-    local download_url3="https://github.com/piplabs/story/releases/download/v1.3.0"
-    local upgrade_height1=640000
-    local upgrade_height2=3861111
-    local upgrade_height3=5707000
-
-    # Create directories and download the binaries
-    cd $HOME
-    mkdir -p $HOME/story-$version1
-    mkdir -p $HOME/story-$version2
-    mkdir -p $HOME/story-$version3
-    if ! wget -P $HOME/story-$version1 $download_url1/$story_file_name -O $HOME/story-$version1/story; then
-        echo "Failed to download the binary for $version1. Exiting."
-        exit 1
-    fi
-    if ! wget -P $HOME/story-$version2 $download_url2/$story_file_name -O $HOME/story-$version2/story; then
-        echo "Failed to download the binary for $version2. Exiting."
-        exit 1
-    fi
-    if ! wget -P $HOME/story-$version3 $download_url3/$story_file_name -O $HOME/story-$version3/story; then
-        echo "Failed to download the binary for $version3. Exiting."
-        exit 1
-    fi
-
-    # Set ownership and permissions
-    sudo chown -R $USER:$USER $HOME/.story && \
-    sudo chown -R $USER:$USER $HOME/story-$version1/story && \
-    sudo chown -R $USER:$USER $HOME/story-$version2/story && \
-    sudo chown -R $USER:$USER $HOME/story-$version3/story && \
-    sudo chmod +x $HOME/story-$version1/story && \
-    sudo chmod +x $HOME/story-$version2/story && \
-    sudo chmod +x $HOME/story-$version3/story && \
-    sudo rm -f $HOME/.story/story/data/upgrade-info.json
-
-    # Add the batch upgrade to cosmovisor
-    if ! cosmovisor add-batch-upgrade --upgrade-list $version1:$HOME/story-$version1/story:$upgrade_height1,$version2:$HOME/story-$version2/story:$upgrade_height2,$version3:$HOME/story-$version3/story:$upgrade_height3; then
-        echo "Failed to add batch upgrade to cosmovisor. Exiting."
-        exit 1
-    fi
+    echo "Historical batch upgrades are disabled; no obsolete binary was staged." >&2
+    return 1
 }
 
 # Menu for selecting the version
-rpc_response=$(curl -s -X POST "https://aeneid.storyrpc.io" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}')
-realtime_block_height=$(echo "$rpc_response" | jq -r '.result' | xargs printf "%d")
-echo "Choose the version to update to:"
-#read -p "There are currently no new versions available."
-echo -e "a. ${YELLOW}v1.1.0${RESET} (${GREEN}Virgil${RESET} Upgrade height: 640,000)"
-echo -e "b. ${YELLOW}v1.4.2${RESET} (${GREEN}Additional update for validator CLI interaction${RESET} Upgrade height: 1,398,904)"
-echo -e "c. ${YELLOW}v1.4.2${RESET} (${GREEN}Ovid${RESET} Upgrade height: 3,861,111)"
-echo -e "d. ${YELLOW}v1.3.0${RESET} (${GREEN}Polybius${RESET} Upgrade height: 5,707,000)"
-echo -e "e. ${YELLOW}v1.3.3${RESET} (${RESET}Upgrade height: 10,032,301)"
-echo -e "f. ${YELLOW}v1.4.0${RESET} (${GREEN}Terence${RESET} Upgrade height: 10,886,680)"
-echo -e "g. ${YELLOW}v1.4.2${RESET} (${GREEN}v1.4 critical security issue fix${RESET} Upgrade height: $(LC_NUMERIC='en_US.UTF-8' printf "%'d" $((realtime_block_height + 100))))"
-echo -e "h. ${YELLOW}v1.5.2${RESET} (${GREEN}Horace - Mandatory Hardfork${RESET} Upgrade height: $(LC_NUMERIC='en_US.UTF-8' printf "%'d" $((realtime_block_height + 100))))"
-echo -e "i. ${YELLOW}v1.6.0${RESET} (${GREEN}DKG + Confidential Data Rails${RESET} Upgrade height: 16,332,000 (but no --upgrade-height flag is being used))"
+rpc_response=$(curl -fsS --connect-timeout 10 --max-time 30 -X POST "https://aeneid.storyrpc.io" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}')
+block_hex=$(jq -er '.result | select(type == "string" and test("^0x[0-9a-fA-F]+$"))' <<< "$rpc_response")
+realtime_block_height=$((16#${block_hex#0x}))
+(( realtime_block_height > 0 )) || { echo "RPC returned an invalid block height." >&2; exit 1; }
+echo "Choose the supported Aeneid consensus version:"
 echo -e "j. ${YELLOW}v1.7.0${RESET} (${GREEN}Seneca${RESET} Upgrade height: $(LC_NUMERIC='en_US.UTF-8' printf "%'d" $((realtime_block_height + 100))))"
-#echo "f. Batch update: Upgrade to v1.1.0 at height 640,000, v1.4.2 at height 858,000, v1.4.2 at height 3,861,111 and v1.3.0 at height 5,707,000 (RECOMMENDED FOR THOSE AIMING TO ACHIEVE ARCHIVE NODE STATUS)."
-read -p "Enter the letter corresponding to the version: " choice
+echo "Historical versions are not offered by this active update flow."
+read -r -p "Enter j to stage v1.7.0, or anything else to cancel: " choice
 
 case $choice in
-    a)
-        update_version "v1.1.0" "https://github.com/piplabs/story/releases/download/v1.1.0" 640000
-        ;;
-    b)
-        update_version "v1.4.2" "https://github.com/piplabs/story/releases/download/v1.4.2" 1398904
-        ;;
-    c)
-        update_version "v1.4.2" "https://github.com/piplabs/story/releases/download/v1.4.2" 3861111
-        ;;
-    d)
-        update_version "v1.3.0" "https://github.com/piplabs/story/releases/download/v1.3.0" 5707000
-        ;;
-    e)
-        update_version "v1.3.3" "https://github.com/piplabs/story/releases/download/v1.3.3" 10032301
-        ;;
-    f)  
-        update_version "v1.4.0" "https://github.com/piplabs/story/releases/download/v1.4.0" 10886680
-        ;;
-    g)
-        update_version "v1.4.2" "https://github.com/piplabs/story/releases/download/v1.4.2" $((realtime_block_height + 100))
-        ;;
-    h)
-        update_version "v1.5.2" "https://github.com/piplabs/story/releases/download/v1.5.2" $((realtime_block_height + 100))
-        ;;
-    i)
-        update_version_no_height "v1.6.0" "https://github.com/piplabs/story/releases/download/v1.6.1" "v1.6.0"
-        ;;
     j)
         update_version "v1.7.0" "https://github.com/piplabs/story/releases/download/v1.7.0" $((realtime_block_height + 100))
         ;;
-    #f)
-        #batch_update_version
-        #;;
     *)
-        echo "Invalid choice. Exiting."
+        echo "Update cancelled. No obsolete version was staged."
         exit 1
         ;;
 esac

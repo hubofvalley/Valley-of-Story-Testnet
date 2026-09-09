@@ -25,7 +25,7 @@ A validator node participates in Story Protocol's consensus mechanism by validat
 
 1. Launch Valley of Story:
    ```bash
-   bash <(curl -s https://raw.githubusercontent.com/hubofvalley/Testnet-Guides/main/Story%20Protocol/resources/valleyofStory.sh)
+   bash <(curl -fsSL https://raw.githubusercontent.com/hubofvalley/Valley-of-Story-Testnet/main/resources/valleyofStory.sh)
    ```
 2. Select **"Node Interactions"** → **"Deploy/re-Deploy Validator Node"**
 3. Follow the interactive prompts
@@ -34,7 +34,7 @@ A validator node participates in Story Protocol's consensus mechanism by validat
 
 | Component | Details |
 |-----------|---------|
-| **story** | Consensus client (v1.5.2) |
+| **story** | Consensus client (v1.7.0) |
 | **story-geth** | Execution client (v1.2.1) |
 | **story.service** | Systemd service for consensus |
 | **story-geth.service** | Systemd service for execution |
@@ -79,10 +79,9 @@ After your node is fully synced:
 1. Launch Valley of Story
 2. Select **"Validator/Key Interactions"** → **"Stake Tokens"**
 3. Choose delegation target:
-   - **Grand Valley** - Delegate to Grand Valley validator
    - **Self** - Delegate to your own validator
-   - **Another validator** - Enter validator pubkey
-4. Select RPC (default or Grand Valley's)
+   - **Another validator** - Enter the selected validator address
+4. Select the default RPC or another verified public RPC
 5. Enter amount in IP (e.g., 1024)
 6. Provide private key (or use local)
 
@@ -147,7 +146,7 @@ This displays:
 2. Select **"Node Interactions"** → **"Add Peers"**
 3. Choose:
    - **Add peers manually** - Enter comma-separated peer addresses
-   - **Use Grand Valley's peers** - Auto-fetch from Grand Valley's RPC
+   - **Use a verified public peer source** - Add peers from a current, trusted network source
 
 ## Key Management
 
@@ -223,7 +222,7 @@ This is normal - it means Story's official RPC is behind your node's height.
 ### Connection Issues
 1. Verify firewall allows P2P ports
 2. Check if your IP is reachable
-3. Add Grand Valley's peers via **"Add Peers"**
+3. Add current trusted peers via **"Add Peers"**
 
 ## Install Story App Only
 
@@ -232,7 +231,7 @@ If you only need to execute transactions without running a full node:
 1. Launch Valley of Story
 2. Select **"Install the Story App only"**
 
-This installs the `story` binary (v1.5.2) for signing transactions.
+This installs the `story` binary (v1.7.0) for signing transactions.
 
 ## Related Documentation
 

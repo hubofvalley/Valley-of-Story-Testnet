@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eo pipefail
 
 # ANSI color codes
 RED='\033[0;31m'
@@ -11,6 +12,11 @@ NC='\033[0m' # No Color
 source $HOME/.bash_profile 2>/dev/null
 STORY_SERVICE_NAME=${STORY_SERVICE_NAME:-story}
 STORY_GETH_SERVICE_NAME=${STORY_GETH_SERVICE_NAME:-story-geth}
+is_valid_service_name() { [[ "$1" =~ ^[A-Za-z0-9_.@-]+$ ]]; }
+is_valid_service_name "$STORY_SERVICE_NAME" && is_valid_service_name "$STORY_GETH_SERVICE_NAME" || {
+    echo -e "${RED}Invalid Story service name configuration. Refusing snapshot application.${NC}" >&2
+    exit 1
+}
 
 # Snapshot URLs
 
@@ -69,12 +75,60 @@ show_menu() {
 # Function to check if a URL is available
 check_url() {
     local url=$1
-    if curl --output /dev/null --silent --head --fail "$url"; then
+    if curl -fsSIL --retry 2 --connect-timeout 10 --max-time 30 "$url" >/dev/null; then
         echo -e "${GREEN}Available${NC}"
     else
         echo -e "${RED}Not available at the moment${NC}"
         return 1
     fi
+}
+
+validate_snapshot_archive() {
+    local archive="$1" listing="$2"
+    [ -s "$archive" ] || { echo -e "${RED}Snapshot archive is empty.${NC}" >&2; return 1; }
+    lz4 -t "$archive" >/dev/null
+    lz4 -dc "$archive" | tar -tf - > "$listing"
+    grep -qE '(^|/)\.\.(\/|$)|^/' "$listing" && {
+        echo -e "${RED}Snapshot archive contains an unsafe path.${NC}" >&2
+        return 1
+    }
+    awk '$1 !~ /^[-d]/ { exit 1 }' <(lz4 -dc "$archive" | tar -tvf -) || {
+        echo -e "${RED}Snapshot archive contains a link or special file.${NC}" >&2
+        return 1
+    }
+}
+
+prepare_snapshot_files() {
+    local stage="$1" listing="$stage/listing"
+    mkdir -p "$stage/story" "$stage/geth"
+    case "$provider_choice" in
+        1|2)
+            [ -n "${STORY_SNAPSHOT_URL:-}" ] && [ -n "${GETH_SNAPSHOT_URL:-}" ] || {
+                echo -e "${RED}Snapshot provider did not resolve both consensus and execution archives.${NC}" >&2
+                return 1
+            }
+            curl -fsSL --retry 3 --connect-timeout 10 --max-time 3600 "$STORY_SNAPSHOT_URL" -o "$download_location/$STORY_SNAPSHOT_FILE"
+            curl -fsSL --retry 3 --connect-timeout 10 --max-time 3600 "$GETH_SNAPSHOT_URL" -o "$download_location/$GETH_SNAPSHOT_FILE"
+            if [ -n "${GV_SHA256_STORY:-}" ]; then
+                [[ "$GV_SHA256_STORY" =~ ^[0-9a-fA-F]{64}$ ]] || { echo -e "${RED}Provider returned an invalid Story checksum.${NC}" >&2; return 1; }
+                printf '%s  %s\n' "$GV_SHA256_STORY" "$download_location/$STORY_SNAPSHOT_FILE" | sha256sum --check --status
+            fi
+            if [ -n "${GV_SHA256_GETH:-}" ]; then
+                [[ "$GV_SHA256_GETH" =~ ^[0-9a-fA-F]{64}$ ]] || { echo -e "${RED}Provider returned an invalid Story-Geth checksum.${NC}" >&2; return 1; }
+                printf '%s  %s\n' "$GV_SHA256_GETH" "$download_location/$GETH_SNAPSHOT_FILE" | sha256sum --check --status
+            fi
+            validate_snapshot_archive "$download_location/$STORY_SNAPSHOT_FILE" "$listing.story"
+            validate_snapshot_archive "$download_location/$GETH_SNAPSHOT_FILE" "$listing.geth"
+            lz4 -dc "$download_location/$STORY_SNAPSHOT_FILE" | tar -xf - -C "$stage/story"
+            lz4 -dc "$download_location/$GETH_SNAPSHOT_FILE" | tar -xf - -C "$stage/geth"
+            [ -d "$stage/story/data" ] || { echo -e "${RED}Consensus archive did not contain data/.${NC}" >&2; return 1; }
+            [ -d "$stage/geth/chaindata" ] || { echo -e "${RED}Execution archive did not contain chaindata/.${NC}" >&2; return 1; }
+            ;;
+        *)
+            echo -e "${RED}Unsupported snapshot provider.${NC}" >&2
+            return 1
+            ;;
+    esac
 }
 
 # Function to display snapshot details
@@ -389,44 +443,17 @@ check_cosmovisor() {
     fi
 }
 
-# Function to suggest update based on snapshot block height
+# Snapshot height does not safely select a consensus binary version.
+# Never send an operator to an obsolete update option based on archive height.
 suggest_update() {
     local snapshot_height=$1
-    current_version=$(cosmovisor version 2>&1 | awk '/^Version/ {print $2}')
-
+    local current_version
+    current_version=$(cosmovisor version 2>&1 | awk '/^Version/ {print $2}' || true)
+    current_version=${current_version:-unknown}
     echo -e "${YELLOW}Current consensus client version: $current_version${NC}"
-
-    if [[ $snapshot_height -ge 0 && $snapshot_height -le 1984903 ]]; then
-        required_version="v1.1.0-stable"
-    elif [[ $snapshot_height -ge 1984904 && $snapshot_height -le 3861111 ]]; then
-        required_version="v1.1.1-stable"
-    elif [[ $snapshot_height -ge 3861112 && $snapshot_height -le 5706999 ]]; then
-        required_version="v1.2.0-stable"
-    elif [[ $snapshot_height -ge 5707000 && $snapshot_height -le 10323000 ]]; then
-        required_version="v1.3.0-stable"
-    elif [[ $snapshot_height -ge 10032301 && $snapshot_height -le 10654637 ]]; then
-        required_version="v1.3.3-stable"
-    elif [[ $snapshot_height -ge 10654638 ]]; then
-        required_version="v1.4.2-stable"
-    fi
-
-    echo -e "${YELLOW}Required version for snapshot block height $snapshot_height: $required_version${NC}"
-
-    if [[ $required_version == "v1.1.1-stable" ]]; then
-        echo -e "${YELLOW}If an update is required, choose option 'b' at the consensus client update prompt.${NC}"
-    elif [[ $required_version == "v1.2.0-stable" ]]; then
-        echo -e "${YELLOW}If an update is required, choose option 'c' at the consensus client update prompt.${NC}"
-    elif [[ $required_version == "v1.3.0-stable" ]]; then
-        echo -e "${YELLOW}If an update is required, choose option 'd' at the consensus client update prompt.${NC}"
-    elif [[ $required_version == "v1.3.3-stable" ]]; then
-        echo -e "${YELLOW}If an update is required, choose option 'e' at the consensus client update prompt.${NC}"
-    elif [[ $required_version == "v1.4.2-stable" ]]; then
-        echo -e "${YELLOW}If an update is required, choose option 'f' at the consensus client update prompt.${NC}"
-    else
-        echo -e "${YELLOW}No update required for the current snapshot block height.${NC}"
-    fi
-
-    read -p "Do you want to update the consensus client version? (y/n): " update_choice
+    echo -e "${YELLOW}Snapshot height: $snapshot_height${NC}"
+    echo -e "${YELLOW}No automatic consensus-version mapping is performed. Review the current Story release separately before any upgrade.${NC}"
+    update_choice="n"
 }
 
 # Main script
@@ -442,11 +469,15 @@ main_script() {
             echo -e "${GREEN}Grand Valley snapshot selected.${NC}"
             echo -e "HEYLO MY STORYFAM... LETS SYNC FASTOOOOOOR!."
 
-            choose_grandvalley_snapshot
+            if ! choose_grandvalley_snapshot; then
+                echo -e "${RED}Grand Valley snapshot selection failed. Nothing was changed.${NC}" >&2
+                exit 1
+            fi
 
             # Suggest update based on snapshot block height
-            snapshot_height=$(curl -s $SNAPSHOT_API_URL | jq -r '.snapshot_height')
-            suggest_update $snapshot_height
+            snapshot_height=$(curl -fsS "$SNAPSHOT_API_URL" | jq -r '.snapshot_height // empty')
+            [ -n "$snapshot_height" ] || { echo -e "${RED}Snapshot metadata did not contain a height.${NC}" >&2; exit 1; }
+            suggest_update "$snapshot_height"
 
             # Ask the user if they want to delete the downloaded snapshot files
             read -p "When the snapshot has been applied (decompressed), do you want to delete the uncompressed files? (y/n): " delete_choice
@@ -463,11 +494,15 @@ main_script() {
             prompt_back_or_continue
 
             # Pilih snapshot DTEAM (set variabel, tampilkan detail, prompt back/continue)
-            choose_DTEAM_snapshot
+            if ! choose_DTEAM_snapshot; then
+                echo -e "${RED}DTEAM snapshot selection failed. Nothing was changed.${NC}" >&2
+                exit 1
+            fi
 
             # Suggest update based on snapshot block height
-            snapshot_height=$(curl -s $DTEAM_PRUNED_API_URL | jq -r '.latest.height')
-            suggest_update $snapshot_height
+            snapshot_height=$(curl -fsS "$DTEAM_PRUNED_API_URL" | jq -r '.latest.height // empty')
+            [ -n "$snapshot_height" ] || { echo -e "${RED}Snapshot metadata did not contain a height.${NC}" >&2; exit 1; }
+            suggest_update "$snapshot_height"
 
             read -p "When the snapshot has been applied (decompressed), do you want to delete the uncompressed files? (y/n): " delete_choice
             ;;
@@ -596,73 +631,78 @@ main_script() {
         #    read -p "When the snapshot has been applied (decompressed), do you want to delete the uncompressed files? (y/n): " delete_choice
         #    ;;
 
-    # Prompt the user for the download location
-    read -p "Enter the directory where you want to download the snapshots (default is $HOME): " download_location
+    # Download and fully stage the snapshot before touching live chain data.
+    read -r -p "Enter the directory where you want to download the snapshots (default is $HOME): " download_location
     download_location=${download_location:-$HOME}
-
-    # Create the download directory if it doesn't exist
-    mkdir -p $download_location
-
-    # Change to the download directory
-    cd $download_location
-
-    # Install required dependencies
+    mkdir -p "$download_location"
+    cd "$download_location"
     sudo apt-get install wget lz4 jq -y
+    snapshot_stage=$(mktemp -d)
+    trap 'rm -rf "$snapshot_stage"' EXIT
+    prepare_snapshot_files "$snapshot_stage"
 
-    # Stop your story-geth and story nodes
-    sudo systemctl stop ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
-    sudo systemctl disable ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
+    echo -e "${GREEN}Snapshot archives downloaded, decompressed, and structurally validated.${NC}"
+    read -r -p "Type APPLY-STORY-SNAPSHOT to stop services and replace chain data: " confirm
+    if [ "$confirm" != "APPLY-STORY-SNAPSHOT" ]; then
+        echo -e "${YELLOW}Snapshot cancelled before downtime.${NC}"
+        exit 0
+    fi
+    read -r -p "When the snapshot has been applied, delete the downloaded archives? (y/n): " delete_choice
 
-    # Back up your validator state
-    cp $HOME/.story/story/data/priv_validator_state.json $HOME/.story/priv_validator_state.json.backup
-
-    # Delete previous geth chaindata and story data folders
-    sudo rm -rf $HOME/.story/geth/aeneid/geth/chaindata $HOME/.story/story/data
-
-    # Download and decompress snapshots based on the provider
-    if [[ $provider_choice -eq 1 ]]; then
-        # Grand Valley: stream directly to destination
-        echo -e "${GREEN}Downloading and decompressing Story snapshot...${NC}"
-        curl -o - -L "$STORY_SNAPSHOT_URL" | lz4 -c -d | tar -x -C "$HOME/.story/story"
-        echo -e "${GREEN}Downloading and decompressing Story-geth snapshot...${NC}"
-        curl -o - -L "$GETH_SNAPSHOT_URL" | lz4 -c -d | tar -x -C "$HOME/.story/geth/aeneid/geth/"
-    elif [[ $provider_choice -eq 2 || $provider_choice -eq 4 ]]; then
-        wget -O $GETH_SNAPSHOT_FILE $GETH_SNAPSHOT_URL
-        wget -O $STORY_SNAPSHOT_FILE $STORY_SNAPSHOT_URL
-        decompress_snapshots
-    elif [[ $provider_choice -eq 3 || $provider_choice -eq 5 ]]; then
-        wget -O $SNAPSHOT_FILE $SNAPSHOT_URL
-        decompress_crouton_originstake_snapshot
+    story_was_active=no
+    geth_was_active=no
+    story_was_enabled=no
+    geth_was_enabled=no
+    sudo systemctl is-active --quiet "$STORY_SERVICE_NAME" && story_was_active=yes || true
+    sudo systemctl is-active --quiet "$STORY_GETH_SERVICE_NAME" && geth_was_active=yes || true
+    sudo systemctl is-enabled --quiet "$STORY_SERVICE_NAME" && story_was_enabled=yes || true
+    sudo systemctl is-enabled --quiet "$STORY_GETH_SERVICE_NAME" && geth_was_enabled=yes || true
+    if ! sudo systemctl stop "$STORY_GETH_SERVICE_NAME" "$STORY_SERVICE_NAME"; then
+        echo -e "${RED}Could not stop both Story services; refusing data replacement.${NC}" >&2
+        [ "$story_was_active" = yes ] && sudo systemctl start "$STORY_SERVICE_NAME" || true
+        [ "$geth_was_active" = yes ] && sudo systemctl start "$STORY_GETH_SERVICE_NAME" || true
+        exit 1
+    fi
+    if sudo systemctl is-active --quiet "$STORY_GETH_SERVICE_NAME" || sudo systemctl is-active --quiet "$STORY_SERVICE_NAME"; then
+        echo -e "${RED}Story services remain active after stop; refusing data replacement.${NC}" >&2
+        [ "$story_was_active" = yes ] && sudo systemctl start "$STORY_SERVICE_NAME" || true
+        [ "$geth_was_active" = yes ] && sudo systemctl start "$STORY_GETH_SERVICE_NAME" || true
+        exit 1
     fi
 
-    # Change ownership of the .story directory
-    sudo chown -R $USER:$USER $HOME/.story
+    timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+    backup_root="$HOME/.story/.valley-snapshot-backup-$timestamp"
+    mkdir -p "$backup_root"
+    cp -a "$HOME/.story/story/data" "$backup_root/story-data"
+    cp "$HOME/.story/story/data/priv_validator_state.json" "$backup_root/priv_validator_state.json"
+    if [ -d "$HOME/.story/geth/aeneid/geth/chaindata" ]; then
+        cp -a "$HOME/.story/geth/aeneid/geth/chaindata" "$backup_root/geth-chaindata"
+    fi
 
-    # Delete downloaded snapshot files if the user chose to do so
-    if [[ $delete_choice == "y" || $delete_choice == "Y" ]]; then
-        if [[ $provider_choice -eq 1 || $provider_choice -eq 2 || $provider_choice -eq 4 ]]; then
-            sudo rm -v $GETH_SNAPSHOT_FILE $STORY_SNAPSHOT_FILE
-        elif [[ $provider_choice -eq 3 || $provider_choice -eq 5 ]]; then
-            sudo rm -v $SNAPSHOT_FILE
-        fi
+    sudo rm -rf "$HOME/.story/story/data" "$HOME/.story/geth/aeneid/geth/chaindata"
+    mkdir -p "$HOME/.story/story" "$HOME/.story/geth/aeneid/geth"
+    cp -a "$snapshot_stage/story/data" "$HOME/.story/story/data"
+    cp -a "$snapshot_stage/geth/chaindata" "$HOME/.story/geth/aeneid/geth/chaindata"
+    cp "$backup_root/priv_validator_state.json" "$HOME/.story/story/data/priv_validator_state.json"
+    sudo chown -R "$USER:$USER" "$HOME/.story"
+
+    if [[ "$delete_choice" == "y" || "$delete_choice" == "Y" ]]; then
+        rm -f "$download_location/$GETH_SNAPSHOT_FILE" "$download_location/$STORY_SNAPSHOT_FILE"
         echo -e "${GREEN}Downloaded snapshot files have been deleted.${NC}"
     else
         echo -e "${GREEN}Downloaded snapshot files have been kept.${NC}"
     fi
 
-    # Restore your validator state
-    cp $HOME/.story/priv_validator_state.json.backup $HOME/.story/story/data/priv_validator_state.json
-
-    # Execute the update script if the user chose to update
-    if [[ $update_choice == "y" || $update_choice == "Y" ]]; then
-        bash <(curl -s https://raw.githubusercontent.com/hubofvalley/Valley-of-Story-Testnet/main/resources/story_update.sh)
+    if [ "$story_was_enabled" = yes ]; then sudo systemctl enable "$STORY_SERVICE_NAME"; else sudo systemctl disable "$STORY_SERVICE_NAME" >/dev/null 2>&1 || true; fi
+    if [ "$geth_was_enabled" = yes ]; then sudo systemctl enable "$STORY_GETH_SERVICE_NAME"; else sudo systemctl disable "$STORY_GETH_SERVICE_NAME" >/dev/null 2>&1 || true; fi
+    if [ "$story_was_active" = yes ]; then sudo systemctl restart "$STORY_SERVICE_NAME"; fi
+    if [ "$geth_was_active" = yes ]; then sudo systemctl restart "$STORY_GETH_SERVICE_NAME"; fi
+    if [ "$story_was_active" != yes ] && [ "$geth_was_active" != yes ]; then
+        echo -e "${YELLOW}Services were inactive before the snapshot and remain stopped.${NC}"
     fi
 
-    # Start your story-geth and story nodes
-    sudo systemctl enable ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
-    sudo systemctl restart ${STORY_GETH_SERVICE_NAME} ${STORY_SERVICE_NAME}
-
     echo -e "${GREEN}Snapshot setup completed successfully.${NC}"
+    echo -e "${YELLOW}Pre-snapshot backup retained at: $backup_root${NC}"
 }
 
 main_script

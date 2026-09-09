@@ -22,7 +22,7 @@ The scheduler:
 
 1. Launch Valley of Story:
    ```bash
-   bash <(curl -s https://raw.githubusercontent.com/hubofvalley/Testnet-Guides/main/Story%20Protocol/resources/valleyofStory.sh)
+   bash <(curl -fsSL https://raw.githubusercontent.com/hubofvalley/Valley-of-Story-Testnet/main/resources/valleyofStory.sh)
    ```
 2. Select **"Node Management"** → **"Schedule Stop/Restart Validator Node"**
 

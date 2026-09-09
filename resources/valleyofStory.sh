@@ -9,21 +9,38 @@ YELLOW='\033[0;33m'
 ORANGE='\033[38;5;214m'
 RESET='\033[0m'
 
-# Service Name Detection - Ask Once, Remember Forever
+# Service name and endpoint configuration
+is_valid_service_name() { [[ "$1" =~ ^[A-Za-z0-9_.@-]+$ ]]; }
+valid_peer_list() { [[ "$1" =~ ^[A-Za-z0-9@.,:_-]+$ ]]; }
 source $HOME/.bash_profile 2>/dev/null
+STORY_OFFICIAL_RPC=${STORY_OFFICIAL_RPC:-https://aeneid.storyrpc.io}
+STORY_PERSISTENT_PEERS=${STORY_PERSISTENT_PEERS:-}
 
-if [ -z "$STORY_SERVICE_NAME" ]; then
+story_service_needs_persist=no
+story_geth_service_needs_persist=no
+if [ -z "${STORY_SERVICE_NAME:-}" ]; then
     echo -e "${YELLOW}Service name configuration not found.${RESET}"
     read -p "Enter Consensus Service Name (default 'story'): " INPUT_SVC
     STORY_SERVICE_NAME=${INPUT_SVC:-story}
-    echo "export STORY_SERVICE_NAME=\"$STORY_SERVICE_NAME\"" >> $HOME/.bash_profile
-    export STORY_SERVICE_NAME
+    story_service_needs_persist=yes
 fi
 
-if [ -z "$STORY_GETH_SERVICE_NAME" ]; then
+if [ -z "${STORY_GETH_SERVICE_NAME:-}" ]; then
     read -p "Enter Geth Service Name (default 'story-geth'): " INPUT_GETH
     STORY_GETH_SERVICE_NAME=${INPUT_GETH:-story-geth}
-    echo "export STORY_GETH_SERVICE_NAME=\"$STORY_GETH_SERVICE_NAME\"" >> $HOME/.bash_profile
+    story_geth_service_needs_persist=yes
+fi
+
+if ! is_valid_service_name "$STORY_SERVICE_NAME" || ! is_valid_service_name "$STORY_GETH_SERVICE_NAME"; then
+    echo -e "${RED}Invalid service name. Use letters, numbers, '.', '_', '@', or '-' only.${RESET}" >&2
+    exit 1
+fi
+if [ "$story_service_needs_persist" = yes ]; then
+    echo "export STORY_SERVICE_NAME=\"$STORY_SERVICE_NAME\"" >> "$HOME/.bash_profile"
+    export STORY_SERVICE_NAME
+fi
+if [ "$story_geth_service_needs_persist" = yes ]; then
+    echo "export STORY_GETH_SERVICE_NAME=\"$STORY_GETH_SERVICE_NAME\"" >> "$HOME/.bash_profile"
     export STORY_GETH_SERVICE_NAME
 fi
 
@@ -66,8 +83,8 @@ ${YELLOW}| Category  | Requirements     |
 PRIVACY_SAFETY_STATEMENT="
 ${YELLOW}Privacy and Safety Statement${RESET}
 
-${GREEN}No User Data Stored Externally${RESET}
-- This script does not store any user data externally. All operations are performed locally on your machine.
+${GREEN}No User Data Stored by Grand Valley${RESET}
+- Keys and node data remain on your machine. Network requests are made only to the endpoint or release sources selected by the workflow.
 
 ${GREEN}No Phishing Links${RESET}
 - This script does not contain any phishing links. All URLs and commands are provided for legitimate purposes related to Story validator node operations.
@@ -86,18 +103,13 @@ ${GREEN}Contact${RESET}
 "
 
 ENDPOINTS="${GREEN}
-Grand Valley Story Protocol public endpoints:${RESET}
-- cosmos-rpc: ${BLUE}https://lightnode-rpc-story.grandvalleys.com${RESET}
-- evm-rpc: ${BLUE}https://lightnode-json-rpc-story.grandvalleys.com${RESET}
-- cosmos rest-api: ${BLUE}https://lightnode-api-story.grandvalleys.com${RESET}
-- cosmos ws: ${BLUE}wss://lightnode-rpc-story.grandvalleys.com/websocket${RESET}
-- evm ws: ${BLUE}wss://lightnode-wss-story.grandvalleys.com${RESET}
-- peer: ${BLUE}7e311e22cff1a0d39c3758e342fa4c2ee1aea461@peer-story.grandvalleys.com:29656${RESET}
-- enode: ${BLUE}enode://4e5e22f7d44a2642a08e5bd86595f1457fc89e828028467a6ebf8623267e7dc5db9ecb4a08b566e631a383be92cfc620d73ff6427e7255867113b9406cd189cc@enode-story.grandvalleys.com:29303${RESET}
+Story Aeneid network reference:${RESET}
+- official RPC reference: ${BLUE}${STORY_OFFICIAL_RPC}${RESET}
 
-${GREEN}Grand Valley Story Testnet validator profile links:${RESET}
-    - ${ORANGE}https://aeneid.staking.story.foundation/validators/0x1b5452a212db06F6D6879C292157396B6dCa44d7${RESET}
-    - ${ORANGE}https://aeneid.storyscan.app/validators/storyvaloper1rd299gsjmvr0d458ns5jz4eeddku53xhm5j2j4${RESET}
+${YELLOW}Grand Valley endpoint status:${RESET}
+- Grand Valley public endpoints are not guaranteed to be live.
+- Verify endpoint availability and chain identity before use.
+- This toolkit does not claim continuous Grand Valley service availability or active-validator-set membership.
 
 ${GREEN}Connect with Story Protocol:${RESET}
 - Official Website: ${BLUE}https://www.story.foundation${RESET}
@@ -107,7 +119,7 @@ ${GREEN}Connect with Story Protocol:${RESET}
 ${GREEN}Connect with Grand Valley:${RESET}
 - X: ${BLUE}https://x.com/bacvalley${RESET}
 - GitHub: ${BLUE}https://github.com/hubofvalley${RESET}
-- Story Testnet Guide on GitHub by Grand Valley: ${BLUE}https://github.com/hubofvalley/Testnet-Guides/tree/main/Story%20Protocol${RESET}
+- Story Testnet toolkit: ${BLUE}https://github.com/hubofvalley/Valley-of-Story-Testnet${RESET}
 - Email: ${BLUE}letsbuidltogether@grandvalleys.com${RESET}
 "
 
@@ -142,8 +154,8 @@ function deploy_validator_node() {
     clear
     echo -e "${RED}▓▒░ IMPORTANT DISCLAIMER AND TERMS ░▒▓${RESET}"
     echo -e "${YELLOW}1. SECURITY:${RESET}"
-    echo -e "- This script ${GREEN}DOES NOT${RESET} send any data outside your server"
-    echo "- All operations are performed locally"
+    echo -e "- Keys and node data remain on your machine"
+    echo "- Network requests go only to the endpoint or release sources selected by the workflow"
     echo "- You are encouraged to audit the script at:"
     echo -e "  ${BLUE}https://github.com/hubofvalley/Valley-of-Story-Testnet/blob/main/resources/story_validator_node_install_aeneid.sh${RESET}"
 
@@ -341,7 +353,7 @@ function query_balance() {
     esac
 
     echo -e "${CYAN}Fetching balance from testnet RPC for $evm_address...${RESET}"
-    curl -s --insecure -X POST https://lightnode-json-rpc-story.grandvalleys.com \
+    curl -fsS -X POST "$STORY_OFFICIAL_RPC" \
         -H "Content-Type: application/json" \
         -d "{
             \"jsonrpc\":\"2.0\",
@@ -364,23 +376,19 @@ function stake_tokens() {
     fi
 
     echo "Choose an option to delegate tokens:"
-    echo "1. Delegate to Grand Valley"
-    echo "2. Delegate to self"
-    echo "3. Delegate to another validator"
-    echo "4. Back"
-    read -p "Enter your choice (1/2/3/4): " CHOICE
+    echo "1. Delegate to self"
+    echo "2. Delegate to another validator"
+    echo "3. Back"
+    read -p "Enter your choice (1/2/3): " CHOICE
 
     case $CHOICE in
         1)
-            VALIDATOR_PUBKEY="0314a9224a61686b5792d2f9f45fd28bd088cc7fa42be60ad1e12fe9540af39f64"
-            ;;
-        2)
             VALIDATOR_PUBKEY=$(story validator export | grep -oP 'Compressed Public Key \(hex\): \K[0-9a-fA-F]+')
             ;;
-        3)
+        2)
             read -p "Enter validator pubkey: " VALIDATOR_PUBKEY
             ;;
-        4)
+        3)
             menu
             ;;
         *)
@@ -391,8 +399,13 @@ function stake_tokens() {
 
     echo "Choose the RPC to use:"
     echo "1. Use default RPC"
-    echo "2. Use Grand Valley's RPC"
+    echo "2. Enter a custom verified RPC"
     read -p "Enter your choice (1/2): " RPC_CHOICE
+    RPC_URL=""
+    if [ "$RPC_CHOICE" = "2" ]; then
+        read -r -p "Enter an HTTPS RPC URL: " RPC_URL
+        [[ "$RPC_URL" == https://* ]] || { echo -e "${RED}Only HTTPS RPC URLs are accepted.${RESET}"; menu; return; }
+    fi
 
     read -p "Enter the amount to stake in IP (e.g., 1024 for 1024 IP, minimum requirement is 1024 IP): " AMOUNT_IP
 
@@ -418,7 +431,7 @@ function stake_tokens() {
     echo "PRIVATE_KEY=$PRIVATE_KEY" > $HOME/.env
 
     if [ "$RPC_CHOICE" == "2" ]; then
-        story validator stake --validator-pubkey $VALIDATOR_PUBKEY --stake $AMOUNT --rpc https://lightnode-json-rpc-story.grandvalleys.com:443 --chain-id "$STORY_CHAIN_ID"
+        story validator stake --validator-pubkey "$VALIDATOR_PUBKEY" --stake "$AMOUNT" --rpc "$RPC_URL" --chain-id "$STORY_CHAIN_ID"
     elif [ "$RPC_CHOICE" == "1" ]; then
         story validator stake --validator-pubkey $VALIDATOR_PUBKEY --stake $AMOUNT --chain-id "$STORY_CHAIN_ID"
     else
@@ -464,8 +477,13 @@ function unstake_tokens() {
 
     echo "Choose the RPC to use:"
     echo "1. Use default RPC"
-    echo "2. Use Grand Valley's RPC"
+    echo "2. Enter a custom verified RPC"
     read -p "Enter your choice (1/2): " RPC_CHOICE
+    RPC_URL=""
+    if [ "$RPC_CHOICE" = "2" ]; then
+        read -r -p "Enter an HTTPS RPC URL: " RPC_URL
+        [[ "$RPC_URL" == https://* ]] || { echo -e "${RED}Only HTTPS RPC URLs are accepted.${RESET}"; menu; return; }
+    fi
 
     read -p "Enter the amount to unstake in IP (e.g., 1024 for 1024 IP, minimum requirement is 1024 IP): " AMOUNT_IP
 
@@ -504,7 +522,7 @@ function unstake_tokens() {
     fi
 
     if [ "$RPC_CHOICE" == "2" ]; then
-        story validator unstake --validator-pubkey $VALIDATOR_PUBKEY --unstake $AMOUNT --enc-key-file "$ENC_KEY_FILE" --rpc https://lightnode-json-rpc-story.grandvalleys.com:443 --chain-id "$STORY_CHAIN_ID"
+        story validator unstake --validator-pubkey "$VALIDATOR_PUBKEY" --unstake "$AMOUNT" --enc-key-file "$ENC_KEY_FILE" --rpc "$RPC_URL" --chain-id "$STORY_CHAIN_ID"
     elif [ "$RPC_CHOICE" == "1" ]; then
         story validator unstake --validator-pubkey $VALIDATOR_PUBKEY --unstake $AMOUNT --enc-key-file "$ENC_KEY_FILE" --chain-id "$STORY_CHAIN_ID"
     else
@@ -587,10 +605,10 @@ function send_ip_token() {
 }
 
 function delete_validator_node() {
-    sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
-    sudo systemctl disable ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
-    sudo rm -rf /etc/systemd/system/${STORY_SERVICE_NAME}.service
-    sudo rm -rf /etc/systemd/system/${STORY_GETH_SERVICE_NAME}.service
+    sudo systemctl stop "$STORY_SERVICE_NAME" "$STORY_GETH_SERVICE_NAME"
+    sudo systemctl disable "$STORY_SERVICE_NAME" "$STORY_GETH_SERVICE_NAME"
+    sudo rm -rf "/etc/systemd/system/${STORY_SERVICE_NAME}.service"
+    sudo rm -rf "/etc/systemd/system/${STORY_GETH_SERVICE_NAME}.service"
     sudo rm -r $HOME/go/bin/story
     sudo rm -r $HOME/go/bin/story-geth $HOME/go/bin/geth
     sudo rm -rf $HOME/.story
@@ -601,14 +619,14 @@ function delete_validator_node() {
 
 function stop_validator_node() {
     sudo systemctl daemon-reload
-    sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
+    sudo systemctl stop "$STORY_SERVICE_NAME" "$STORY_GETH_SERVICE_NAME"
     echo "Consensus client and Geth service stopped."
     menu
 }
 
 function restart_validator_node() {
     sudo systemctl daemon-reload
-    sudo systemctl restart ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
+    sudo systemctl restart "$STORY_SERVICE_NAME" "$STORY_GETH_SERVICE_NAME"
     echo -e "\n${GREEN}Consensus client and Geth service restarted.${RESET}"
     menu
 }
@@ -647,13 +665,18 @@ function backup_validator_key() {
 function add_peers() {
     echo "Select an option:"
     echo "1. Add peers manually"
-    echo "2. Use Grand Valley's peers"
+    echo "2. Use the configured peer list"
     echo "3. Back"
     read -p "Enter your choice (1, 2, or 3): " choice
 
     case $choice in
         1)
-            read -p "Enter peers (comma-separated): " peers
+            read -r -p "Enter peers (comma-separated): " peers
+            if ! valid_peer_list "$peers"; then
+                echo -e "${RED}Invalid peer list. Use comma-separated id@host:port values only.${RESET}"
+                menu
+                return
+            fi
             echo "You have entered the following peers: $peers"
             read -p "Do you want to proceed? (yes/no): " confirm
             if [[ $confirm == "yes" ]]; then
@@ -665,12 +688,22 @@ function add_peers() {
             fi
             ;;
         2)
-            peers=$(curl -sS https://lightnode-rpc-story.grandvalleys.com/net_info | jq -r '.result.peers[] | "\(.node_info.id)@\(.remote_ip):\(.node_info.listen_addr)"' | awk -F ':' '{print $1":"$(NF)}' | paste -sd, -)
-            echo "Grand Valley's peers: $peers"
+            peers="$STORY_PERSISTENT_PEERS"
+            if [ -z "$peers" ]; then
+                echo -e "${YELLOW}No configured peer list is available. Set STORY_PERSISTENT_PEERS or add peers manually.${RESET}"
+                menu
+                return
+            fi
+            if ! valid_peer_list "$peers"; then
+                echo -e "${RED}Configured peer list is invalid. Refusing to write it.${RESET}"
+                menu
+                return
+            fi
+            echo "Configured peers: $peers"
             read -p "Do you want to proceed? (yes/no): " confirm
             if [[ $confirm == "yes" ]]; then
-                sed -i -e "s|^persistent_peers *=.*|persistent_peers = \"7e311e22cff1a0d39c3758e342fa4c2ee1aea461@peer-story.grandvalleys.com:28656,$peers\"|" $HOME/.story/story/config/config.toml
-                echo "Grand Valley's peers added."
+                sed -i -e "s|^persistent_peers *=.*|persistent_peers = \"$peers\"|" "$HOME/.story/story/config/config.toml"
+                echo "Configured peers added."
             else
                 echo "Operation cancelled. Returning to menu."
                 menu
@@ -725,14 +758,14 @@ function migrate_to_cosmovisor() {
 # New functions for stopping and restarting individual services
 function stop_consensus_client() {
     sudo systemctl daemon-reload
-    sudo systemctl stop ${STORY_SERVICE_NAME}
+    sudo systemctl stop "$STORY_SERVICE_NAME"
     echo "Consensus client service stopped."
     menu
 }
 
 function stop_geth() {
     sudo systemctl daemon-reload
-    sudo systemctl stop ${STORY_GETH_SERVICE_NAME}
+    sudo systemctl stop "$STORY_GETH_SERVICE_NAME"
     echo "Geth service stopped."
     menu
 }
@@ -752,33 +785,33 @@ function schedule_validator_node() {
 
 function restart_consensus_client() {
     sudo systemctl daemon-reload
-    sudo systemctl restart ${STORY_SERVICE_NAME}
+    sudo systemctl restart "$STORY_SERVICE_NAME"
     echo "Consensus client service restarted."
     menu
 }
 
 function restart_geth() {
     sudo systemctl daemon-reload
-    sudo systemctl restart ${STORY_GETH_SERVICE_NAME}
+    sudo systemctl restart "$STORY_GETH_SERVICE_NAME"
     echo "Geth service restarted."
     menu
 }
 
 function show_all_logs() {
     echo "Displaying both Consensus Client and Geth Logs:"
-    sudo journalctl -u ${STORY_SERVICE_NAME} -u ${STORY_GETH_SERVICE_NAME} -fn 100
+    sudo journalctl -u "$STORY_SERVICE_NAME" -u "$STORY_GETH_SERVICE_NAME" -fn 100
     menu
 }
 
 function show_consensus_client_logs() {
     echo "Displaying Consensus Client Logs:"
-    sudo journalctl -u ${STORY_SERVICE_NAME} -fn 100
+    sudo journalctl -u "$STORY_SERVICE_NAME" -fn 100
     menu
 }
 
 function show_geth_logs() {
     echo "Displaying Geth Logs:"
-    sudo journalctl -u ${STORY_GETH_SERVICE_NAME} -fn 100
+    sudo journalctl -u "$STORY_GETH_SERVICE_NAME" -fn 100
     menu
 }
 
@@ -828,7 +861,7 @@ function show_guidelines() {
     echo -e "${CYAN}Guidelines on How to Use the Valley of Story${RESET}"
     echo -e "${YELLOW}This tool is designed to help you manage your Story Validator Node. Below are the guidelines on how to use it effectively:${RESET}"
     echo -e "${GREEN}1. Navigating the Menu${RESET}"
-    echo "   - The menu is divided into several sections: Node Interactions, Validator/Key Interactions, Node Management, Show Grand Valley's Endpoints, and Guidelines."
+    echo "   - The menu is divided into Node Interactions, Validator/Key Interactions, Node Management, endpoint status, and Guidelines."
     echo "   - To select an option, you can either:"
     echo "     a. Enter the corresponding number followed by the letter (e.g., 1a for Deploy/re-Deploy Validator Node)."
     echo "     b. Enter the number, press Enter, and then enter the letter (e.g., 1 then a)."
@@ -854,8 +887,8 @@ function show_guidelines() {
     echo "      - Guide: Use this option to update your consensus client to the latest version or migrate to Cosmovisor for better management."
     echo "   c. Apply Snapshot: Applies a snapshot to the node."
     echo "      - Guide: This option will apply a snapshot to your node, which can significantly speed up the syncing process."
-    echo "   d. Add Peers: Adds peers to the node, either manually or using Grand Valley's peers."
-    echo "      - Guide: Use this option to add peers to your node. You can either enter peers manually or use Grand Valley's peers for better connectivity."
+    echo "   d. Add Peers: Adds peers to the node manually or from STORY_PERSISTENT_PEERS after independent verification."
+    echo "      - Guide: Use this option to add peers manually or from STORY_PERSISTENT_PEERS after independent verification."
     echo "   e. Update Geth Version: Updates the Geth version."
     echo "      - Guide: This option will update your Geth client to the latest version. Ensure you have a stable internet connection."
     echo "   f. Show Validator Node Status: Displays the status of the validator node."
@@ -874,7 +907,7 @@ function show_guidelines() {
     echo "   c. Query Balance: Queries the balance of an EVM address."
     echo "      - Guide: This option will show the balance of a specified EVM address. You can choose to query your own address or another address."
     echo "   d. Stake Tokens: Stakes tokens to a validator."
-    echo "      - Guide: Use this option to stake tokens to a validator. You can choose to stake to Grand Valley, yourself, or another validator."
+    echo "      - Guide: Use this option to stake tokens to yourself or another validator after independently verifying the destination."
     echo "   e. Unstake Tokens: Unstakes tokens from a validator."
     echo "      - Guide: This option will help you unstake tokens from a validator. You can choose to unstake from yourself or another validator."
     echo "   f. Export EVM Key: Exports the EVM key."
@@ -896,11 +929,11 @@ function show_guidelines() {
     echo "      - Guide: This option will backup your validator key to your home directory. Ensure you keep this key secure."
     echo "   h. Delete Validator Node: Deletes the validator node. Ensure you backup your seeds phrase/EVM-private key and priv_validator_key.json before doing this."
     echo "      - Guide: Use this option to delete your validator node. Make sure to backup all important data before proceeding."
-    echo -e "${GREEN}Install Story App only: Installs the Story app (v1.3.3) for executing transactions without running the node.${RESET}"
+    echo -e "${GREEN}Install Story App only: Installs Story v1.7.0 for executing transactions without running the node.${RESET}"
     echo "      - Guide: Use this option to install the Story app if you only need to execute transactions without running a full node."
-    echo -e "${GREEN}Show Grand Valley's Endpoints:${RESET}"
-    echo "   Displays Grand Valley's public endpoints."
-    echo "      - Guide: This option will show you the public endpoints provided by Grand Valley. These endpoints can be used for various operations."
+    echo -e "${GREEN}Show Endpoint Status & Links:${RESET}"
+    echo "   Displays the official RPC reference and endpoint status notes."
+    echo "      - Guide: Verify endpoint availability and chain identity before use."
     echo -e "${GREEN}Show Guidelines:${RESET}"
     echo "   Displays these guidelines."
     echo "      - Guide: Use this option to view the guidelines on how to use the tool effectively."
@@ -952,8 +985,8 @@ function menu() {
     echo "   h. Delete Validator Node (BACKUP YOUR SEEDS PHRASE/EVM-PRIVATE KEY AND priv_validator_key.json BEFORE YOU DO THIS)"
     echo "   i. Schedule Stop/Restart Validator Node"
     echo "   j. Update Go Version (v1.24.0)"
-    echo -e "${GREEN}4. Install the Story App (v1.3.3) only to execute transactions without running a node${RESET}"
-    echo -e "${GREEN}5. Show Grand Valley's Endpoints${RESET}"
+    echo -e "${GREEN}4. Install the Story App (v1.7.0) only to execute transactions without running a node${RESET}"
+    echo -e "${GREEN}5. Show Endpoint Status & Links${RESET}"
     echo -e "${YELLOW}6. Show Guidelines${RESET}"
     echo -e "${RED}7. Exit${RESET}"
 
@@ -963,7 +996,7 @@ function menu() {
     echo -e "\n${YELLOW}Please run the following command to apply the changes after exiting the script:${RESET}"
     echo -e "${GREEN}source ~/.bash_profile${RESET}"
     echo -e "${YELLOW}This ensures the environment variables are set in your current bash session.${RESET}"
-    echo -e "Stake your Testnet IP with Grand Valley: ${ORANGE}https://aeneid.staking.story.foundation/validators/0x1b5452a212db06F6D6879C292157396B6dCa44d7${RESET}"
+    echo -e "Verify any validator or endpoint destination independently before signing transactions."
     echo -e "${GREEN}Let's Buidl Story Together - Grand Valley${RESET}"
     read -p "Choose an option (e.g., 1a or 1 then a): " OPTION
 

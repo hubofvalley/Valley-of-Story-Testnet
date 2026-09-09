@@ -4,6 +4,11 @@
 source $HOME/.bash_profile 2>/dev/null
 STORY_SERVICE_NAME=${STORY_SERVICE_NAME:-story}
 STORY_GETH_SERVICE_NAME=${STORY_GETH_SERVICE_NAME:-story-geth}
+is_valid_service_name() { [[ "$1" =~ ^[A-Za-z0-9_.@-]+$ ]]; }
+is_valid_service_name "$STORY_SERVICE_NAME" && is_valid_service_name "$STORY_GETH_SERVICE_NAME" || {
+    echo "Invalid Story service name configuration. Refusing migration." >&2
+    exit 1
+}
 
 # Function to install cosmovisor
 install_cosmovisor() {
@@ -33,8 +38,17 @@ init_cosmovisor() {
     mkdir -p $HOME/.story/story/cosmovisor/backup
 }
 
+# Prompt and validate the proxy_app port before any migration mutation.
+read -r -p "Enter your preferred port number: (leave empty to use default: 26)" STORY_PORT
+STORY_PORT=${STORY_PORT:-26}
+if ! [[ "$STORY_PORT" =~ ^[0-9]{2}$ ]] || ((STORY_PORT < 10 || STORY_PORT > 64)); then
+    echo "Invalid port prefix. Use a two-digit value from 10 to 64." >&2
+    exit 1
+fi
+STORY_PROXY_APP_PORT="$STORY_PORT"
+
 # Install and initialize cosmovisor
-sudo rm -r $HOME/.story/story/data/upgrade-info.json
+sudo rm -r "$HOME/.story/story/data/upgrade-info.json"
 install_cosmovisor
 init_cosmovisor
 
@@ -61,12 +75,6 @@ if [ -z "$input3" ]; then
     exit 1
 fi
 
-# Prompt for the proxy_app port that will be used by the consensus client service
-read -p "Enter your preferred port number: (leave empty to use default: 26)" STORY_PORT
-if [ -z "$STORY_PROXY_APP_PORT" ]; then
-    STORY_PROXY_APP_PORT=26
-fi
-
 # Export environment variables
 echo "export DAEMON_NAME=story" >> $HOME/.bash_profile
 echo "export DAEMON_HOME=$input2" >> $HOME/.bash_profile
@@ -74,7 +82,7 @@ echo "export DAEMON_DATA_BACKUP_DIR=$input3" >> $HOME/.bash_profile
 source $HOME/.bash_profile
 
 # Create or update the systemd service file
-sudo tee /etc/systemd/system/story.service > /dev/null <<EOF
+sudo tee "/etc/systemd/system/${STORY_SERVICE_NAME}.service" > /dev/null <<EOF
 [Unit]
 Description=Cosmovisor Story Node
 After=network.target
@@ -103,6 +111,6 @@ EOF
 
 # Reload and Restart systemd to apply changes
 sudo systemctl daemon-reload
-sudo systemctl restart ${STORY_SERVICE_NAME}
+sudo systemctl restart "$STORY_SERVICE_NAME"
 
 echo "Cosmovisor migration completed successfully."

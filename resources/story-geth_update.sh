@@ -14,6 +14,11 @@ geth_file_name=geth-linux-amd64
 source $HOME/.bash_profile 2>/dev/null
 STORY_SERVICE_NAME=${STORY_SERVICE_NAME:-story}
 STORY_GETH_SERVICE_NAME=${STORY_GETH_SERVICE_NAME:-story-geth}
+is_valid_service_name() { [[ "$1" =~ ^[A-Za-z0-9_.@-]+$ ]]; }
+is_valid_service_name "$STORY_SERVICE_NAME" && is_valid_service_name "$STORY_GETH_SERVICE_NAME" || {
+    echo "Invalid Story service name configuration. Refusing geth update." >&2
+    exit 1
+}
 
 # Function to update to a specific version
 update_version() {
@@ -38,7 +43,7 @@ update_version() {
             echo "Build failed. Exiting."
             exit 1
         fi
-        sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
+        sudo systemctl stop "$STORY_SERVICE_NAME" "$STORY_GETH_SERVICE_NAME"
         if ! cp build/bin/geth "$HOME/go/bin/"; then
             echo "Failed to copy binary. Exiting."
             exit 1
@@ -52,7 +57,7 @@ update_version() {
             echo "Failed to download the binary. Exiting."
             exit 1
         fi
-        sudo systemctl stop ${STORY_SERVICE_NAME} ${STORY_GETH_SERVICE_NAME}
+        sudo systemctl stop "$STORY_SERVICE_NAME" "$STORY_GETH_SERVICE_NAME"
         sudo mv "$HOME/story-geth-$version/geth" "$HOME/go/bin/geth"
         sudo chown -R "$USER:$USER" "$HOME/go/bin/geth"
         sudo chmod +x "$HOME/go/bin/geth"
@@ -62,25 +67,22 @@ update_version() {
     fi
 
     sudo systemctl daemon-reload
-    sudo systemctl restart ${STORY_GETH_SERVICE_NAME} && sleep 5 && sudo systemctl restart ${STORY_SERVICE_NAME}
+    sudo systemctl restart "$STORY_GETH_SERVICE_NAME" && sleep 5 && sudo systemctl restart "$STORY_SERVICE_NAME"
 }
 
 # Menu for selecting the version
-echo "Choose the version to update to:"
-echo "a. v1.1.0 (Cosmas)"
+echo "Choose the supported Aeneid execution-client version:"
 echo "b. v1.2.1 (Yasunari)"
+echo "Historical versions are not offered by this active update flow."
 
-read -p "Enter the letter corresponding to the version: " choice
+read -r -p "Enter b to stage v1.2.1, or anything else to cancel: " choice
 
 case $choice in
-    a)
-        update_version "v1.1.0" "https://github.com/piplabs/story-geth/releases/download/v1.1.0"
-        ;;
     b)
         update_version "v1.2.1" "https://github.com/piplabs/story-geth/releases/download/v1.2.1"
         ;;
     *)
-        echo "Invalid choice. Exiting."
+        echo "Update cancelled. No obsolete version was staged."
         exit 1
         ;;
 esac
